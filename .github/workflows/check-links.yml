@@ -4,19 +4,15 @@ on:
   workflow_call:
     inputs:
       lychee-config:
-        description: Path (in the caller repo) to a lychee config; falls back to the bundled default.
         type: string
         default: ''
       lychee-args:
-        description: Arguments/globs passed to lychee; if empty, a sensible default glob set is used.
         type: string
         default: ''
       create-issue-on-main:
-        description: File an issue when links break on the main branch.
         type: boolean
         default: true
       skip-label:
-        description: PR label that skips the link check.
         type: string
         default: 'links checked by hand'
 
@@ -42,7 +38,6 @@ jobs:
           LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
           if printf '%s\n' "$LABELS" | grep -Fxq "$SKIP_LABEL"; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Link check skipped - '$SKIP_LABEL' label present on PR"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
@@ -54,26 +49,3 @@ jobs:
         with:
           lychee-config: ${{ inputs.lychee-config }}
           lychee-args: ${{ inputs.lychee-args }}
-
-      - name: Create issue on main branch if links are broken
-        if: failure() && github.ref == 'refs/heads/main' && inputs.create-issue-on-main
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          BODY=$(cat <<EOF
-          The link checker found broken links in the main branch.
-
-          **Workflow Run:** $RUN_URL
-
-          Please review the workflow logs above for details on which links are broken.
-
-          This issue was automatically created by the link checker workflow.
-
-          @copilot please fix the broken links found in the main branch.
-          EOF
-          )
-          gh issue create \
-            --title "Broken links detected in main branch" \
-            --body "$BODY" \
-            --label "bug,automated,copilot"
