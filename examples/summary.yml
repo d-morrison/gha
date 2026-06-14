@@ -1,4 +1,5 @@
 # Copy to .github/workflows/summary.yml in your repo.
+# NOTE: the calling job must grant issues:write + models:read.
 name: Summarize new issues
 
 on:
@@ -7,4 +8,8 @@ on:
 
 jobs:
   summary:
+    permissions:
+      issues: write
+      models: read
+      contents: read
     uses: d-morrison/gha/.github/workflows/summary.yml@v1

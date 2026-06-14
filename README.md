@@ -46,6 +46,22 @@ Pin to `@v1` (a moving major tag updated as fixes land). Do not reference
 | `summary.yml` | AI summary comment on newly opened issues | — |
 | `check-news.yml` | Enforce a `NEWS.md` changelog entry on PRs (wraps `UCD-SERG/changelog-check-action`) | `changelog` |
 
+## Permissions
+
+A called reusable workflow cannot hold more `GITHUB_TOKEN` permissions than the
+caller grants, and most repos default to a **read-only** token. So workflows
+that need to write must have the **caller** grant it on the calling job:
+
+- `check-links` (opens an issue on `main` failures) → grant `issues: write`,
+  `pull-requests: read`, `contents: read`.
+- `summary` (comments on issues, calls the models API) → grant `issues: write`,
+  `models: read`, `contents: read`.
+- `check-bibliography-dois`, `check-non-standard-chars` → only `contents: read`
+  (the default), so no `permissions:` block is needed.
+
+The stubs in [`examples/`](examples) already include the right `permissions:`
+blocks — copy them as-is.
+
 ## Versioning
 
 Releases are tagged `vX.Y.Z`; the `vX` major tag moves to the latest compatible

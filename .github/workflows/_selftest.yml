@@ -2,6 +2,7 @@ name: selftest
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -11,3 +12,13 @@ jobs:
       issues: write
       pull-requests: read
     uses: ./.github/workflows/check-links.yml
+    with:
+      create-issue-on-main: false
+  chars:
+    uses: ./.github/workflows/check-non-standard-chars.yml
+  bib:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/check-bibliography-dois.yml
+    with:
+      no-metadata-check: true

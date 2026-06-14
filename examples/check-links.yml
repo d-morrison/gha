@@ -1,4 +1,6 @@
 # Copy to .github/workflows/check-links.yml in your repo.
+# NOTE: the calling job grants issues:write so the workflow can open an issue
+# when links break on main. Required because repos default to a read-only token.
 name: Check Links
 
 on:
@@ -14,6 +16,10 @@ on:
 
 jobs:
   check:
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
     uses: d-morrison/gha/.github/workflows/check-links.yml@v1
     # with:
     #   lychee-config: lychee.toml       # use a repo-local config instead of the bundled default
