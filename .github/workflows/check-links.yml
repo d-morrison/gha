@@ -2,38 +2,12 @@ name: Check Links (reusable)
 
 on:
   workflow_call:
-    inputs:
-      lychee-config:
-        description: Path (in the caller repo) to a lychee config; falls back to the bundled default.
-        type: string
-        default: ''
-      lychee-args:
-        description: Arguments/globs passed to lychee (the --config flag is appended automatically).
-        type: string
-        default: "--verbose --no-progress './**/*.qmd' './**/*.md' './**/*.html'"
-      create-issue-on-main:
-        description: File an issue when links break on the main branch.
-        type: boolean
-        default: true
-      skip-label:
-        description: PR label that skips the link check.
-        type: string
-        default: 'links checked by hand'
 
 jobs:
   link-checker:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      issues: write
-      pull-requests: read
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Check links
-        id: lychee
-        uses: d-morrison/gha/check-links@v1
-        with:
-          lychee-config: ${{ inputs.lychee-config }}
-          lychee-args: ${{ inputs.lychee-args }}
+      - uses: actions/checkout@v4
+      - uses: d-morrison/gha/check-links@v1
