@@ -24,28 +24,8 @@ jobs:
       issues: write
       pull-requests: read
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Check for manual override label
-        id: check-label
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          SKIP_LABEL: ${{ inputs.skip-label }}
-        run: |
-          LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
-          if printf '%s\n' "$LABELS" | grep -Fxq "$SKIP_LABEL"; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Check links
-        id: lychee
-        if: github.event_name != 'pull_request' || steps.check-label.outputs.skip != 'true'
-        uses: d-morrison/gha/check-links@v1
+      - uses: actions/checkout@v4
+      - uses: d-morrison/gha/check-links@v1
         with:
           lychee-config: ${{ inputs.lychee-config }}
           lychee-args: ${{ inputs.lychee-args }}
