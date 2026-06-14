@@ -7,3 +7,7 @@ on:
 jobs:
   links:
     uses: ./.github/workflows/check-links.yml
+  chars:
+    uses: ./.github/workflows/check-non-standard-chars.yml
+  bib:
+    uses: ./.github/workflows/check-bibliography-dois.yml

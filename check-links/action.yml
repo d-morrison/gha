@@ -9,32 +9,40 @@ inputs:
       the file does not exist, the bundled default config is used.
     default: ''
   lychee-args:
-    description: Arguments/globs passed to lychee (the --config flag is appended automatically).
-    default: "--verbose --no-progress './**/*.qmd' './**/*.md' './**/*.html'"
+    description: >-
+      Arguments/globs passed to lychee (the --config flag is appended
+      automatically). If empty, a sensible default glob set is used.
+    default: ''
   fail:
     description: Fail the action when broken links are found.
     default: 'true'
 runs:
   using: composite
   steps:
-    - name: Resolve lychee config
+    - name: Resolve lychee config and args
       id: cfg
       shell: bash
       env:
         USER_CONFIG: ${{ inputs.lychee-config }}
+        USER_ARGS: ${{ inputs.lychee-args }}
       run: |
         if [ -n "$USER_CONFIG" ] && [ -f "$USER_CONFIG" ]; then
-          echo "path=$USER_CONFIG" >> "$GITHUB_OUTPUT"
+          echo "config=$USER_CONFIG" >> "$GITHUB_OUTPUT"
           echo "Using caller-provided lychee config: $USER_CONFIG"
         else
-          echo "path=$GITHUB_ACTION_PATH/lychee.default.toml" >> "$GITHUB_OUTPUT"
+          echo "config=$GITHUB_ACTION_PATH/lychee.default.toml" >> "$GITHUB_OUTPUT"
           echo "Using bundled default lychee config"
+        fi
+        if [ -n "$USER_ARGS" ]; then
+          echo "args=$USER_ARGS" >> "$GITHUB_OUTPUT"
+        else
+          echo "args=--verbose --no-progress './**/*.qmd' './**/*.md' './**/*.html'" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Check links
       uses: lycheeverse/lychee-action@v2
       with:
-        args: ${{ inputs.lychee-args }} --config ${{ steps.cfg.outputs.path }}
+        args: ${{ steps.cfg.outputs.args }} --config ${{ steps.cfg.outputs.config }}
         fail: ${{ inputs.fail }}
       env:
         GITHUB_TOKEN: ${{ github.token }}
