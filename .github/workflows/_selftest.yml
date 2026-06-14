@@ -5,5 +5,5 @@ on:
   workflow_dispatch:
 
 jobs:
-  bib:
-    uses: ./.github/workflows/check-bibliography-dois.yml
+  links:
+    uses: ./.github/workflows/check-links.yml
