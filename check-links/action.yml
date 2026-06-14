@@ -1,0 +1,40 @@
+name: Check links with lychee
+description: >-
+  Run the lychee link checker over the caller's repository using a bundled
+  default config. Callers may override the config and the file globs.
+inputs:
+  lychee-config:
+    description: >-
+      Path (relative to the caller repo) to a lychee config file. If empty or
+      the file does not exist, the bundled default config is used.
+    default: ''
+  lychee-args:
+    description: Arguments/globs passed to lychee (the --config flag is appended automatically).
+    default: "--verbose --no-progress './**/*.qmd' './**/*.md' './**/*.html'"
+  fail:
+    description: Fail the action when broken links are found.
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Resolve lychee config
+      id: cfg
+      shell: bash
+      env:
+        USER_CONFIG: ${{ inputs.lychee-config }}
+      run: |
+        if [ -n "$USER_CONFIG" ] && [ -f "$USER_CONFIG" ]; then
+          echo "path=$USER_CONFIG" >> "$GITHUB_OUTPUT"
+          echo "Using caller-provided lychee config: $USER_CONFIG"
+        else
+          echo "path=$GITHUB_ACTION_PATH/lychee.default.toml" >> "$GITHUB_OUTPUT"
+          echo "Using bundled default lychee config"
+        fi
+
+    - name: Check links
+      uses: lycheeverse/lychee-action@v2
+      with:
+        args: ${{ inputs.lychee-args }} --config ${{ steps.cfg.outputs.path }}
+        fail: ${{ inputs.fail }}
+      env:
+        GITHUB_TOKEN: ${{ github.token }}

@@ -1,0 +1,18 @@
+name: Check NEWS.md Changelog (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      changelog:
+        description: Path to the changelog file to check.
+        type: string
+        default: 'NEWS.md'
+
+jobs:
+  Check-Changelog:
+    name: Check Changelog Action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: UCD-SERG/changelog-check-action@v2
+        with:
+          changelog: ${{ inputs.changelog }}

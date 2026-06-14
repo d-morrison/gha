@@ -1,0 +1,58 @@
+name: Check bibliography DOIs
+description: >-
+  Validate that every book/article BibTeX entry has a DOI that resolves and
+  whose CrossRef metadata is consistent with the entry. Scans all *.bib files
+  in the caller's repository.
+inputs:
+  install-quarto:
+    description: Install Quarto when setting up R dependencies.
+    default: 'false'
+  no-metadata-check:
+    description: Skip CrossRef metadata comparison (only check DOI presence + URL resolves).
+    default: 'false'
+  exclude-keys:
+    description: >-
+      Space/comma-separated BibTeX keys to skip (e.g. older books without DOIs).
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Set up R
+      uses: r-lib/actions/setup-r@v2
+      with:
+        use-public-rspm: true
+
+    - name: Set up R dependencies
+      uses: r-lib/actions/setup-r-dependencies@v2
+      with:
+        install-quarto: ${{ inputs.install-quarto }}
+        extra-packages: |
+          any::bib2df
+          any::httr
+          any::jsonlite
+          any::stringr
+
+    - name: Find bibliography files
+      id: find-bibs
+      shell: bash
+      run: |
+        BIB_FILES=$(find . -name "*.bib" -not -path "./.git/*" | tr '\n' ' ')
+        echo "Found bibliography files: $BIB_FILES"
+        echo "bib_files=$BIB_FILES" >> "$GITHUB_OUTPUT"
+
+    - name: Check bibliography DOIs
+      if: steps.find-bibs.outputs.bib_files != ''
+      shell: bash
+      env:
+        BIB_FILES: ${{ steps.find-bibs.outputs.bib_files }}
+        BIB_EXCLUDE_KEYS: ${{ inputs.exclude-keys }}
+        NO_METADATA_CHECK: ${{ inputs.no-metadata-check }}
+      run: |
+        ARGS=""
+        if [ "$NO_METADATA_CHECK" = "true" ]; then ARGS="--no-metadata-check"; fi
+        Rscript "$GITHUB_ACTION_PATH/check-bibliography-dois.R" $ARGS $BIB_FILES
+
+    - name: Summary
+      if: success()
+      shell: bash
+      run: echo "✓ All bibliography entries have valid DOIs"

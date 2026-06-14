@@ -1,0 +1,21 @@
+# Copy to .github/workflows/check-links.yml in your repo.
+name: Check Links
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  schedule:
+    # Run weekly on Mondays at 9:00 UTC to catch link rot
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check:
+    uses: d-morrison/gha/.github/workflows/check-links.yml@v1
+    # with:
+    #   lychee-config: lychee.toml       # use a repo-local config instead of the bundled default
+    #   create-issue-on-main: true
+    #   skip-label: 'links checked by hand'

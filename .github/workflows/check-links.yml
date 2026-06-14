@@ -1,0 +1,79 @@
+name: Check Links (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      lychee-config:
+        description: Path (in the caller repo) to a lychee config; falls back to the bundled default.
+        type: string
+        default: ''
+      lychee-args:
+        description: Arguments/globs passed to lychee (the --config flag is appended automatically).
+        type: string
+        default: "--verbose --no-progress './**/*.qmd' './**/*.md' './**/*.html'"
+      create-issue-on-main:
+        description: File an issue when links break on the main branch.
+        type: boolean
+        default: true
+      skip-label:
+        description: PR label that skips the link check.
+        type: string
+        default: 'links checked by hand'
+
+jobs:
+  link-checker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check for manual override label
+        id: check-label
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SKIP_LABEL: ${{ inputs.skip-label }}
+        run: |
+          LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
+          if printf '%s\n' "$LABELS" | grep -Fxq "$SKIP_LABEL"; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Link check skipped - '$SKIP_LABEL' label present on PR"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check links
+        id: lychee
+        if: github.event_name != 'pull_request' || steps.check-label.outputs.skip != 'true'
+        uses: d-morrison/gha/check-links@v1
+        with:
+          lychee-config: ${{ inputs.lychee-config }}
+          lychee-args: ${{ inputs.lychee-args }}
+
+      - name: Create issue on main branch if links are broken
+        if: failure() && github.ref == 'refs/heads/main' && inputs.create-issue-on-main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          BODY=$(cat <<EOF
+          The link checker found broken links in the main branch.
+
+          **Workflow Run:** $RUN_URL
+
+          Please review the workflow logs above for details on which links are broken.
+
+          This issue was automatically created by the link checker workflow.
+
+          @copilot please fix the broken links found in the main branch.
+          EOF
+          )
+          gh issue create \
+            --title "Broken links detected in main branch" \
+            --body "$BODY" \
+            --label "bug,automated,copilot"
