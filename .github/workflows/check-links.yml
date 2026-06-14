@@ -3,15 +3,9 @@ name: Check Links (reusable)
 on:
   workflow_call:
     inputs:
-      lychee-config:
+      lychee-args:
         type: string
-        default: ''
-      create-issue-on-main:
-        type: boolean
-        default: true
-      skip-label:
-        type: string
-        default: 'links checked by hand'
+        default: 'simple-value'
 
 jobs:
   link-checker:
@@ -21,5 +15,3 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: d-morrison/gha/check-links@v1
-        with:
-          lychee-config: ${{ inputs.lychee-config }}
