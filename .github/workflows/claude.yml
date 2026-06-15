@@ -147,6 +147,12 @@ jobs:
         env:
           SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
         run: |
+          # Fail fast with a clear message: an empty token would rewrite the
+          # URL with no credentials and surface as a confusing auth error.
+          if [ -z "$SUBMODULES_TOKEN" ]; then
+            echo "::error::checkout-submodules is enabled but the SUBMODULES_TOKEN secret is empty. Pass it via 'secrets: inherit' (or set the secret), or set checkout-submodules: false."
+            exit 1
+          fi
           git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           git submodule update --init --recursive --depth 1
 
