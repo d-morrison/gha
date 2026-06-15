@@ -45,6 +45,8 @@ Pin to `@v1` (a moving major tag updated as fixes land). Do not reference
 | `check-links.yml` | lychee link check with bundled config, PR skip-label, and auto-issue on `main` | `lychee-config`, `lychee-args`, `create-issue-on-main`, `skip-label` |
 | `summary.yml` | AI summary comment on newly opened issues | — |
 | `check-news.yml` | Enforce a `NEWS.md` changelog entry on PRs (wraps `UCD-SERG/changelog-check-action`) | `changelog` |
+| `claude.yml` | Agent-mode Claude Code bot: responds to `@claude` mentions, edits files, opens/updates PRs | `setup-r`, `install-quarto`, `use-renv`, `prompt-addendum`, `reviewer` |
+| `claude-code-review.yml` | Read-only Claude PR review (runs the `code-review` plugin, posts inline findings) | `pr-number`, `prompt-addendum` |
 
 ## Permissions
 
@@ -58,9 +60,21 @@ that need to write must have the **caller** grant it on the calling job:
   `models: read`, `contents: read`.
 - `check-bibliography-dois`, `check-non-standard-chars` → only `contents: read`
   (the default), so no `permissions:` block is needed.
+- `claude` (pushes branches, opens PRs, dispatches the review workflow) → grant
+  `contents: write`, `pull-requests: write`, `issues: write`, `id-token: write`,
+  `actions: write`, and add the `CLAUDE_CODE_OAUTH_TOKEN` secret.
+- `claude-code-review` (read-only review) → grant `contents: read`,
+  `pull-requests: write`, `issues: write`, `id-token: write`, and the
+  `CLAUDE_CODE_OAUTH_TOKEN` secret.
 
 The stubs in [`examples/`](examples) already include the right `permissions:`
 blocks — copy them as-is.
+
+The two Claude workflows are a pair: an `@claude review` mention (or any commit
+Claude pushes) routes through `claude.yml`, which dispatches `claude-code-review.yml`
+via `workflow_dispatch`. Install both, and keep the review stub named
+`claude-code-review.yml` (or set `claude.yml`'s `review-workflow-file` input to
+match) so the dispatch resolves.
 
 ## Versioning
 
@@ -77,4 +91,4 @@ automatically. A **private** consumer must allow access to this repo under
 
 This is the pilot set (the byte-identical / near-identical workflow families).
 Additional families (spell check, lint-changed-files, pr-commands, R-CMD-check,
-publish/preview, Claude bots) may be added later.
+publish/preview) may be added later.
