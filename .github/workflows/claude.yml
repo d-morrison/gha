@@ -48,7 +48,7 @@ on:
           any::rcmdcheck
           local::.
       renv-cache-version:
-        description: renv cache-version; keep in sync with claude-code-review.yml to share the cache.
+        description: renv cache-version passed to setup-renv; bump to invalidate the cached library.
         type: string
         default: '1'
       checkout-submodules:
@@ -75,13 +75,17 @@ on:
         # That sidesteps the whole class of destructive push variants rather
         # than enumerating deny patterns; the denials below are defense-in-
         # depth in case a push tool is ever re-added to the allow list.
+        # `gh pr create` is likewise omitted: PR creation is owned by the
+        # post-steps (and the agent has no push), so granting it would only
+        # invite duplicate or malformed PRs. `gh pr edit` stays — it needs no
+        # push and lets the agent tidy a PR's title/body.
         # `gh api` is allowed for the read-only polling loop, but its write
         # forms (`-X`/`--method` mutations and `graphql`) are denied so a
         # write-scoped GITHUB_TOKEN can't be used for arbitrary API mutations;
         # the trusted-author gate remains the primary containment.
         default: >-
           --allowedTools
-          "Bash(Rscript -e 'lintr::lint*'),Bash(Rscript -e 'devtools::check*'),Bash(Rscript -e 'devtools::document*'),Bash(Rscript -e 'devtools::test*'),Bash(Rscript -e 'spelling::spell_check*'),Bash(Rscript -e 'roxygen2::roxygenise*'),Bash(quarto render:*),Bash(git diff:*),Bash(git log:*),Bash(git status:*),Bash(git show:*),Bash(git checkout:*),Bash(git switch:*),Bash(git branch:*),Bash(git add:*),Bash(git commit:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh issue view:*),Bash(gh api:*),Read,Glob,Grep,Edit,MultiEdit,Write"
+          "Bash(Rscript -e 'lintr::lint*'),Bash(Rscript -e 'devtools::check*'),Bash(Rscript -e 'devtools::document*'),Bash(Rscript -e 'devtools::test*'),Bash(Rscript -e 'spelling::spell_check*'),Bash(Rscript -e 'roxygen2::roxygenise*'),Bash(quarto render:*),Bash(git diff:*),Bash(git log:*),Bash(git status:*),Bash(git show:*),Bash(git checkout:*),Bash(git switch:*),Bash(git branch:*),Bash(git add:*),Bash(git commit:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr edit:*),Bash(gh issue view:*),Bash(gh api:*),Read,Glob,Grep,Edit,MultiEdit,Write"
           --disallowedTools
           "Bash(gh api -X:*),Bash(gh api --method:*),Bash(gh api graphql:*),Bash(git push:*),Bash(git push --force:*),Bash(git push -f:*),Bash(git push --delete:*),Bash(git push -d:*),Bash(git push --mirror:*),Bash(git push --tags:*),Bash(git push --all:*),Bash(git push origin:*),Bash(git push -u origin:*)"
       runs-on:
@@ -241,7 +245,8 @@ jobs:
         id: claude
         uses: anthropics/claude-code-action@v1
         # GH_TOKEN authenticates the `gh` commands granted in claude-args
-        # (gh pr create/edit/view); without it `gh` prompts and fails in CI.
+        # (gh pr view/diff/edit, gh issue view, gh api); without it `gh`
+        # prompts and fails in CI.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
