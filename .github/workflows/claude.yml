@@ -100,8 +100,12 @@ on:
         type: string
         default: 'ubuntu-latest'
     secrets:
+      # `required: false` so callers don't hard-fail at the call gate when a
+      # secret is unavailable (e.g. fork-originated events): GitHub evaluates
+      # required secrets before this workflow's job-level `if:` can run. The
+      # trusted-author `if:` already gates who can trigger a run.
       CLAUDE_CODE_OAUTH_TOKEN:
-        required: true
+        required: false
       SUBMODULES_TOKEN:
         required: false
 

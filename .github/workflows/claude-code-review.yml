@@ -24,8 +24,13 @@ on:
         type: string
         default: ''
     secrets:
+      # `required: false` so callers don't hard-fail at the call gate on
+      # fork `pull_request` events, where secrets are unavailable: GitHub
+      # evaluates required secrets before this workflow's job-level `if:`
+      # (which already skips fork PRs) can run. With it optional, fork PRs
+      # skip cleanly instead of red-X'ing. Same-repo runs still pass it.
       CLAUDE_CODE_OAUTH_TOKEN:
-        required: true
+        required: false
 
 jobs:
   claude-review:
