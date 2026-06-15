@@ -55,6 +55,13 @@ on:
         description: Check out private submodules using the SUBMODULES_TOKEN secret.
         type: boolean
         default: false
+      eager-pr:
+        description: >-
+          On an issue trigger, open the draft PR up front (before Claude works,
+          like GitHub Copilot) instead of only at the end. Empty PRs from runs
+          that produce no code are closed automatically.
+        type: boolean
+        default: false
       reviewer:
         description: GitHub user re-requested as reviewer when Claude pushes commits to a PR.
         type: string
@@ -226,20 +233,71 @@ jobs:
 
       # Create a feature branch for issue triggers so Claude's commits land
       # somewhere durable (agent mode skips the action's built-in setup-branch
-      # step). The "Push branch and open draft PR" post-step pushes it.
+      # step). The finalize post-step pushes it. If an open PR for this issue
+      # already exists (a prior @claude run, or an assign-then-comment double
+      # trigger), adopt its branch instead of creating a second one — branches
+      # are `claude/issue-<N>-<ts>`, so a `claude/issue-<N>-` prefix matches.
       - name: Set up branch for issue trigger
         id: issue_branch
         if: |
           github.event_name == 'issues' ||
           (github.event_name == 'issue_comment' && !github.event.issue.pull_request)
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          BRANCH="claude/issue-${ISSUE_NUMBER}-$(date -u +%Y%m%d-%H%M%S)"
-          git checkout -b "$BRANCH"
+          EXISTING=$(gh pr list --state open --json number,url,headRefName \
+            --jq '[.[] | select(.headRefName | startswith("claude/issue-'"$ISSUE_NUMBER"'-"))][0] // empty')
+          if [ -n "$EXISTING" ]; then
+            PR_NUM=$(echo "$EXISTING" | jq -r '.number')
+            BRANCH=$(echo "$EXISTING" | jq -r '.headRefName')
+            echo "Adopting existing PR #$PR_NUM ($BRANCH) for issue #$ISSUE_NUMBER"
+            gh pr checkout "$PR_NUM"
+            echo "existing_pr=$(echo "$EXISTING" | jq -r '.url')" >> "$GITHUB_OUTPUT"
+          else
+            BRANCH="claude/issue-${ISSUE_NUMBER}-$(date -u +%Y%m%d-%H%M%S)"
+            git checkout -b "$BRANCH"
+            echo "Created and switched to $BRANCH"
+          fi
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
           echo "starting_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "Created and switched to $BRANCH"
+
+      # eager-pr: open the draft PR BEFORE Claude runs (mirrors GitHub Copilot's
+      # assign-to-PR flow) so there's an immediate PR to watch. An empty seed
+      # commit gives the branch something to open a PR from; the finalize step
+      # closes the PR again if Claude commits nothing. Skipped when a PR for
+      # this issue already exists (adopted above) — that one is reused.
+      - name: Open draft PR up front for issue trigger
+        id: eager_pr
+        if: |
+          inputs.eager-pr &&
+          steps.issue_branch.outputs.branch != '' &&
+          steps.issue_branch.outputs.existing_pr == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.issue_branch.outputs.branch }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "Start @claude work on #${ISSUE_NUMBER}"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH"
+          PR_BODY=$(printf 'Draft PR opened by `@claude` to address #%s (work in progress).\n\nTriggered by [workflow run](%s).\n\nAddresses #%s.\n' \
+            "$ISSUE_NUMBER" "$RUN_URL" "$ISSUE_NUMBER")
+          PR_TITLE="${ISSUE_TITLE:-Claude response to issue #${ISSUE_NUMBER}}"
+          PR_URL=$(gh pr create \
+            --base "${{ github.event.repository.default_branch }}" \
+            --head "$BRANCH" \
+            --draft \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY")
+          echo "pr_url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "seed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          gh issue comment "$ISSUE_NUMBER" --repo "${{ github.repository }}" \
+            --body "Opened draft PR up front: ${PR_URL} — Claude is working on it now." \
+            || echo "::warning::Could not post up-front PR link."
 
       - name: Run Claude Code
         id: claude
@@ -279,11 +337,11 @@ jobs:
 
             Git & PR handling (a workflow step does the pushing/PR-opening,
             not you):
-            - **Issue triggers**: a fresh `claude/issue-N-<timestamp>` branch
-              has already been created and checked out for you. Make your edits
-              and `git commit` them. Do NOT create another branch and do NOT
-              run `gh pr create` — a post-step pushes the branch and opens a
-              draft PR linking back to the issue.
+            - **Issue triggers**: a `claude/issue-N-<timestamp>` branch has
+              already been created and checked out for you. Make your edits and
+              `git commit` them. Do NOT create another branch and do NOT run
+              `gh pr create` — a post-step pushes the branch and opens (or, if a
+              draft PR is already open, updates) the PR linking back to the issue.
             - **PR triggers**: the PR's head branch is already checked out for
               you. Make your edits and `git commit` them. Do NOT push — a
               post-step pushes your commits when the head SHA moves.
@@ -355,17 +413,21 @@ jobs:
           ENTITY_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
-          ISSUE_BRANCH_STARTING_SHA: ${{ steps.issue_branch.outputs.starting_sha }}
+          ISSUE_BRANCH: ${{ steps.issue_branch.outputs.branch }}
+          # Baseline for issue triggers: the eager-pr seed commit if we opened a
+          # PR up front, else the branch's starting point.
+          ISSUE_BASELINE_SHA: ${{ steps.eager_pr.outputs.seed_sha || steps.issue_branch.outputs.starting_sha }}
           PR_HEAD_BEFORE: ${{ steps.head_before.outputs.sha }}
           PR_HEAD_AFTER: ${{ steps.head_after.outputs.sha }}
         run: |
-          # Did Claude commit anything? Issue triggers: local HEAD vs the
-          # pre-step's recorded tip. PR triggers: PR head SHA before vs after.
-          # A non-empty "after" is required so a failed fetch isn't misread as
-          # "committed" (which would wrongly suppress the prose post).
+          # Did Claude commit anything? Issue triggers: $BRANCH tip vs the
+          # baseline (seed commit or branch start) — measure the branch, not
+          # HEAD, in case the agent detached. PR triggers: PR head SHA before
+          # vs after. A non-empty "after" is required so a failed fetch isn't
+          # misread as "committed" (which would wrongly suppress the post).
           COMMITTED=false
-          if [ -n "$ISSUE_BRANCH_STARTING_SHA" ]; then
-            [ "$(git rev-parse HEAD)" != "$ISSUE_BRANCH_STARTING_SHA" ] && COMMITTED=true
+          if [ -n "$ISSUE_BRANCH" ] && [ -n "$ISSUE_BASELINE_SHA" ]; then
+            [ "$(git rev-parse "$ISSUE_BRANCH")" != "$ISSUE_BASELINE_SHA" ] && COMMITTED=true
           fi
           if [ -n "$PR_HEAD_BEFORE" ] && [ -n "$PR_HEAD_AFTER" ] && [ "$PR_HEAD_AFTER" != "$PR_HEAD_BEFORE" ]; then
             COMMITTED=true
@@ -454,10 +516,12 @@ jobs:
             echo "No new commits on PR head; skipping review dispatch."
           fi
 
-      # Pair to "Set up branch for issue trigger": push the branch Claude
-      # committed to and open a draft PR. Runs on always() so partial work is
-      # preserved even if the Claude step failed.
-      - name: Push branch and open draft PR for issue trigger
+      # Pair to "Set up branch for issue trigger": push Claude's commits and, in
+      # lazy mode, open the draft PR. In eager-pr mode (or when a PR was adopted
+      # for this issue) the PR already exists — push the new commits and dispatch
+      # a review, or close the empty up-front PR if Claude produced nothing.
+      # Runs on always() so partial work is preserved even if Claude failed.
+      - name: Push branch and finalize PR for issue trigger
         if: |
           always() &&
           steps.issue_branch.outputs.branch != ''
@@ -465,42 +529,58 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH: ${{ steps.issue_branch.outputs.branch }}
           STARTING_SHA: ${{ steps.issue_branch.outputs.starting_sha }}
+          SEED_SHA: ${{ steps.eager_pr.outputs.seed_sha }}
+          EAGER_PR_URL: ${{ steps.eager_pr.outputs.pr_url }}
+          EXISTING_PR_URL: ${{ steps.issue_branch.outputs.existing_pr }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REVIEW_WF: ${{ inputs.review-workflow-file }}
         run: |
-          CURRENT_SHA=$(git rev-parse HEAD)
-          if [ "$CURRENT_SHA" = "$STARTING_SHA" ]; then
-            echo "No new commits on $BRANCH — Claude produced no changes; skipping push/PR."
+          # Measure the tip of $BRANCH (not HEAD): the agent has git checkout/
+          # switch in its toolset, so a stray detach would make HEAD diverge
+          # from the branch we actually push.
+          CURRENT_SHA=$(git rev-parse "$BRANCH")
+          # Baseline for "did Claude commit?": the seed commit in eager mode,
+          # else the branch's starting point.
+          BASELINE="${SEED_SHA:-$STARTING_SHA}"
+          # A PR already exists when we opened one up front (eager) or adopted
+          # an open PR for this issue.
+          PR_URL="${EAGER_PR_URL:-$EXISTING_PR_URL}"
+
+          if [ "$CURRENT_SHA" = "$BASELINE" ]; then
+            echo "No new commits from Claude on $BRANCH."
+            if [ -n "$EAGER_PR_URL" ]; then
+              # We opened an empty draft PR up front; close it (and its branch)
+              # so a prose-only / no-op run doesn't leave clutter behind.
+              echo "Closing empty up-front draft PR $EAGER_PR_URL"
+              gh pr close "$EAGER_PR_URL" --delete-branch \
+                --comment "Closing: \`@claude\` produced no code changes for #${ISSUE_NUMBER}." \
+                || echo "::warning::Could not close empty draft PR $EAGER_PR_URL."
+            fi
             exit 0
           fi
-          echo "Pushing $BRANCH ($STARTING_SHA -> $CURRENT_SHA)"
+
+          echo "Pushing $BRANCH ($BASELINE -> $CURRENT_SHA)"
           git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH"
-          EXISTING=$(gh pr list --head "$BRANCH" --state open --json url --jq '.[0].url // empty')
-          if [ -n "$EXISTING" ]; then
-            echo "PR already exists for $BRANCH: $EXISTING"
-            PR_URL="$EXISTING"
-            PR_VERB="pushed new commits to existing draft PR"
-          else
-            # "Addresses #N" (not "Closes #N") is deliberate: this is a draft
-            # of Claude's attempt and may not fully resolve the issue, so
-            # merging it should not auto-close the issue.
+
+          if [ -z "$PR_URL" ]; then
+            # Lazy mode, first run: open the draft PR now that there are commits.
+            # "Addresses #N" (not "Closes #N") is deliberate: this is a draft of
+            # Claude's attempt and may not fully resolve the issue, so merging it
+            # should not auto-close the issue.
             PR_BODY=$(printf 'Draft PR opened by `@claude` to address #%s.\n\nTriggered by [workflow run](%s).\n\nAddresses #%s.\n' \
               "$ISSUE_NUMBER" "$RUN_URL" "$ISSUE_NUMBER")
-            if [ -z "$ISSUE_TITLE" ]; then
-              PR_TITLE="Claude response to issue #${ISSUE_NUMBER}"
-            else
-              PR_TITLE="$ISSUE_TITLE"
-            fi
+            PR_TITLE="${ISSUE_TITLE:-Claude response to issue #${ISSUE_NUMBER}}"
             PR_URL=$(gh pr create \
               --base "${{ github.event.repository.default_branch }}" \
               --head "$BRANCH" \
               --draft \
               --title "$PR_TITLE" \
               --body "$PR_BODY")
-            echo "Opened draft PR: $PR_URL"
             PR_VERB="opened draft PR"
+          else
+            PR_VERB="pushed new commits to draft PR"
           fi
           # Dispatch a review on the new commits (the review's own concurrency
           # group dedupes a redundant dispatch).

@@ -11,7 +11,10 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened]
+    # `assigned` lets an issue that already mentions @claude kick off a run when
+    # it's assigned (handy with eager-pr). The trusted-author gate keys on the
+    # issue *author*, so this only fires for issues opened by a collaborator.
+    types: [opened, assigned]
   pull_request_review:
     types: [submitted]
 
@@ -30,6 +33,7 @@ jobs:
     #   install-quarto: true        # for Quarto books
     #   use-renv: true              # restore deps with renv instead of DESCRIPTION
     #   checkout-submodules: true   # needs the SUBMODULES_TOKEN secret
+    #   eager-pr: true              # open the draft PR up front (Copilot-style)
     #   reviewer: d-morrison        # re-requested when Claude pushes to a PR
     #   prompt-addendum: |
     #     This is the <name> R package. Before committing, run
