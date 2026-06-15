@@ -75,11 +75,15 @@ on:
         # That sidesteps the whole class of destructive push variants rather
         # than enumerating deny patterns; the denials below are defense-in-
         # depth in case a push tool is ever re-added to the allow list.
+        # `gh api` is allowed for the read-only polling loop, but its write
+        # forms (`-X`/`--method` mutations and `graphql`) are denied so a
+        # write-scoped GITHUB_TOKEN can't be used for arbitrary API mutations;
+        # the trusted-author gate remains the primary containment.
         default: >-
           --allowedTools
           "Bash(Rscript -e 'lintr::lint*'),Bash(Rscript -e 'devtools::check*'),Bash(Rscript -e 'devtools::document*'),Bash(Rscript -e 'devtools::test*'),Bash(Rscript -e 'spelling::spell_check*'),Bash(Rscript -e 'roxygen2::roxygenise*'),Bash(quarto render:*),Bash(git diff:*),Bash(git log:*),Bash(git status:*),Bash(git show:*),Bash(git checkout:*),Bash(git switch:*),Bash(git branch:*),Bash(git add:*),Bash(git commit:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh issue view:*),Bash(gh api:*),Read,Glob,Grep,Edit,MultiEdit,Write"
           --disallowedTools
-          "Bash(git push:*),Bash(git push --force:*),Bash(git push -f:*),Bash(git push --delete:*),Bash(git push -d:*),Bash(git push --mirror:*),Bash(git push --tags:*),Bash(git push --all:*),Bash(git push origin:*),Bash(git push -u origin:*)"
+          "Bash(gh api -X:*),Bash(gh api --method:*),Bash(gh api graphql:*),Bash(git push:*),Bash(git push --force:*),Bash(git push -f:*),Bash(git push --delete:*),Bash(git push -d:*),Bash(git push --mirror:*),Bash(git push --tags:*),Bash(git push --all:*),Bash(git push origin:*),Bash(git push -u origin:*)"
       runs-on:
         description: Runner for the job.
         type: string
@@ -255,11 +259,16 @@ jobs:
             **Before declaring the task complete, check for additional @claude
             requests that arrived after the triggering event:**
 
-            1. Fetch the latest comments:
-               `gh api 'repos/${{ github.repository }}/issues/${{ github.event.issue.number || github.event.pull_request.number }}/comments' --paginate`
-            2. Identify comments where ALL of: `created_at` is strictly later
-               than the triggering comment; body contains `@claude`; and
-               `user.login` is neither `claude[bot]` nor `github-actions[bot]`.
+            1. Fetch the latest activity. Always check the issue/PR
+               conversation; on a PR also check review comments and reviews
+               (a follow-up `@claude` can land in any of them):
+               - `gh api 'repos/${{ github.repository }}/issues/${{ github.event.issue.number || github.event.pull_request.number }}/comments' --paginate`
+               - PRs only: `gh api 'repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.issue.number }}/comments' --paginate`
+               - PRs only: `gh api 'repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.issue.number }}/reviews' --paginate`
+            2. Identify entries where ALL of: `created_at` (reviews use
+               `submitted_at`) is strictly later than the triggering event;
+               `body` contains `@claude`; and `user.login` is neither
+               `claude[bot]` nor `github-actions[bot]`.
             3. Address each match in this same session (chronological order),
                then repeat from step 1. Stop when none remain.
 
