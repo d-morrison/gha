@@ -1,7 +1,6 @@
 # Active caller for this repo's own reusable Claude PR review workflow
 # (dogfooding). Distinct filename from the reusable
-# .github/workflows/claude-code-review.yml it calls. References @main until a v1
-# tag includes the Claude family.
+# .github/workflows/claude-code-review.yml it calls.
 name: Claude Code Review
 
 on:
@@ -21,7 +20,7 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
-    uses: d-morrison/gha/.github/workflows/claude-code-review.yml@main
+    uses: d-morrison/gha/.github/workflows/claude-code-review.yml@v1
     secrets: inherit
     with:
       pr-number: ${{ inputs.pr_number }}

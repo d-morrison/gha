@@ -1,6 +1,5 @@
 # Active caller for this repo's own reusable Claude agent workflow (dogfooding).
 # Distinct filename from the reusable .github/workflows/claude.yml it calls.
-# References @main until a v1 tag includes the Claude family.
 #  - setup-r: false — this is a GitHub Actions repo, not an R package, so there
 #    is no DESCRIPTION for setup-r-dependencies to install.
 #  - eager-pr: true — open the draft PR up front (Copilot-style).
@@ -26,7 +25,7 @@ jobs:
       issues: write
       id-token: write
       actions: write
-    uses: d-morrison/gha/.github/workflows/claude.yml@main
+    uses: d-morrison/gha/.github/workflows/claude.yml@v1
     secrets: inherit
     with:
       setup-r: false
