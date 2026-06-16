@@ -113,12 +113,21 @@ jobs:
             list in the summary. Reserve the top-level summary comment for a
             brief overall verdict plus any finding not tied to a specific line;
             don't restate each inline comment there.
+
+            If the inline-comment tool isn't available in this environment
+            (dispatched reviews run in agent mode without it — see
+            claude-code-action #635), don't announce that and don't drop the
+            findings: put every finding in the top-level summary comment
+            instead, grouped by file with `path:line` anchors.
             ${{ inputs.prompt-addendum }}
           # `track_progress` forces tag mode, which guarantees a tracking
           # comment even when the plugin scores the PR below its post
           # threshold. The action REJECTS `track_progress` for
           # workflow_dispatch, so gate it on event_name: tag mode for
           # pull_request, agent mode (possibly silent) for dispatched runs.
+          # Tag mode also initializes the inline-comment tool; agent mode does
+          # not (claude-code-action #635), so the prompt above falls back to a
+          # summary-only review on dispatched runs.
           track_progress: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
           # Fresh tracking comment per run so each push surfaces as new PR
           # activity; the collapse step below folds priors up as OUTDATED.
