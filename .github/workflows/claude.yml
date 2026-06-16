@@ -309,7 +309,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit --allow-empty -m "Start @claude work on #${ISSUE_NUMBER}"
           git push "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH"
-          PR_BODY=$(printf 'PR opened by `@claude` to address #%s (work in progress).\n\nTriggered by [workflow run](%s).\n\nAddresses #%s.\n' \
+          PR_BODY=$(printf 'PR opened by `@claude` to address #%s.\n\nTriggered by [workflow run](%s).\n\nAddresses #%s.\n' \
             "$ISSUE_NUMBER" "$RUN_URL" "$ISSUE_NUMBER")
           PR_TITLE="${ISSUE_TITLE:-Claude response to issue #${ISSUE_NUMBER}}"
           PR_URL=$(gh pr create \
@@ -632,9 +632,11 @@ jobs:
           # On success, drop "draft " from PR_VERB so the issue comment below
           # describes the PR's real (now-ready) state.
           if [ "$MARK_READY" = "true" ] && [ "$CLAUDE_OUTCOME" = "success" ]; then
-            gh pr ready "${PR_URL##*/}" \
-              && PR_VERB="${PR_VERB/draft /}" \
-              || echo "::warning::Could not mark PR #${PR_URL##*/} ready for review."
+            if gh pr ready "${PR_URL##*/}"; then
+              PR_VERB="${PR_VERB/draft /}"
+            else
+              echo "::warning::Could not mark PR #${PR_URL##*/} ready for review."
+            fi
           fi
           gh issue comment "$ISSUE_NUMBER" --repo "${{ github.repository }}" \
             --body "Pushed Claude's commits to \`${BRANCH}\` and ${PR_VERB}: ${PR_URL}" \
