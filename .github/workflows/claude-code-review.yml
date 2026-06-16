@@ -172,6 +172,45 @@ jobs:
                 }' -f id="$NODE_ID" || true
             done
 
+      # When this run is canceled (e.g. cancel-in-progress fires because a newer
+      # commit superseded it), tag mode's tracking comment is left stuck showing
+      # an unfinished "review in progress". Explain the cancellation in the
+      # comment, then fold it (minimize as OUTDATED) so the PR doesn't carry a
+      # perpetual in-progress review. Tag mode only runs on pull_request, so a
+      # tracking comment only exists there. The tracking comment is THIS run's
+      # claude[bot] comment, identified by the run it links to — the same
+      # matcher the collapse step uses.
+      - name: Explain and fold tracking comment when canceled
+        if: cancelled() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          NOTE=$(printf '> [!WARNING]\n> **Review canceled.** This run was canceled before it finished — usually because a newer commit superseded it (`cancel-in-progress`). A fresh review runs on the latest commit; see the [canceled run](%s).\n\n---\n\n' "$RUN_URL")
+          # The paginated list already carries each comment's body, so capture it
+          # here (base64-encoded so an embedded tab/newline can't break the
+          # tab-delimited `read`) rather than making a second per-comment fetch.
+          gh api --paginate "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --jq '.[]
+                  | select(.user.login == "claude[bot]")
+                  | "\(.node_id)\t\(.id)\t\(((.body | capture("actions/runs/(?<r>[0-9]+)").r)?) // "")\t\(.body | @base64)"' \
+          | while IFS=$'\t' read -r NODE_ID COMMENT_ID RUN_ID B64_BODY; do
+              [ "$RUN_ID" = "$CURRENT_RUN_ID" ] || continue
+              echo "Annotating and folding canceled tracking comment $COMMENT_ID (run $RUN_ID)"
+              BODY=$(printf '%s' "$B64_BODY" | base64 -d)
+              gh api -X PATCH "repos/$REPO/issues/comments/$COMMENT_ID" -f body="${NOTE}${BODY}" \
+                || echo "::warning::Could not update canceled tracking comment $COMMENT_ID."
+              gh api graphql -f query='
+                mutation($id: ID!) {
+                  minimizeComment(input: {subjectId: $id, classifier: OUTDATED}) {
+                    minimizedComment { isMinimized }
+                  }
+                }' -f id="$NODE_ID" || echo "::warning::Could not fold canceled tracking comment."
+            done
+
       - name: Re-assign reviewers after Claude finishes
         if: always() && steps.stash.outcome == 'success'
         env:
