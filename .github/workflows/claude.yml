@@ -15,7 +15,7 @@ name: Claude Code (reusable)
 # tag mode provides — so this workflow reproduces it with explicit pre/post
 # steps:
 #   - "Set up branch for issue trigger" creates claude/issue-N-<ts>.
-#   - "Push branch and open draft PR for issue trigger" pushes it + opens a
+#   - "Push branch and finalize PR for issue trigger" pushes it + opens a
 #     draft PR, so an @claude mention on an *issue* yields a PR.
 #   - "Post Claude's response if no code was committed" surfaces prose replies
 #     (questions/reviews) that agent mode would otherwise discard.
