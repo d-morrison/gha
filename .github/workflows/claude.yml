@@ -21,6 +21,9 @@ name: Claude Code (reusable)
 #     (questions/reviews) that agent mode would otherwise discard.
 #   - "Dispatch <review-workflow-file> on @claude review" routes review
 #     requests to the dedicated reviewer instead of self-reviewing.
+#   - When Claude finishes successfully with committed code, the push/finalize
+#     steps take the draft PR out of draft (mark-ready-for-review) so a human
+#     knows it is ready to review.
 
 on:
   workflow_call:
@@ -70,6 +73,13 @@ on:
         description: Workflow file (in the caller repo) dispatched to review Claude's commits.
         type: string
         default: 'claude-code-review.yml'
+      mark-ready-for-review:
+        description: >-
+          When Claude finishes successfully with committed code, take its draft
+          PR out of draft mode so a human knows it is ready to review. Set false
+          to leave Claude's PRs as drafts.
+        type: boolean
+        default: true
       prompt-addendum:
         description: Repo-specific instructions appended to Claude's prompt (e.g. the pre-commit checklist).
         type: string
@@ -517,6 +527,8 @@ jobs:
           SHA_AFTER: ${{ steps.head_after.outputs.sha }}
           REVIEWER: ${{ inputs.reviewer }}
           REVIEW_WF: ${{ inputs.review-workflow-file }}
+          MARK_READY: ${{ inputs.mark-ready-for-review }}
+          CLAUDE_OUTCOME: ${{ steps.claude.outcome }}
         run: |
           PR_NUMBER="${{ github.event.pull_request.number || github.event.issue.number }}"
           echo "before=$SHA_BEFORE  after=$SHA_AFTER"
@@ -528,6 +540,13 @@ jobs:
             fi
             gh workflow run "$REVIEW_WF" -f pr_number="$PR_NUMBER" \
               || echo "::warning::Could not dispatch $REVIEW_WF."
+            # Claude finished successfully with new commits: take the PR out of
+            # draft so a human knows it's ready to review. `gh pr ready` is a
+            # no-op on an already-ready PR.
+            if [ "$MARK_READY" = "true" ] && [ "$CLAUDE_OUTCOME" = "success" ]; then
+              gh pr ready "$PR_NUMBER" \
+                || echo "::warning::Could not mark PR #$PR_NUMBER ready for review."
+            fi
           else
             echo "No new commits on PR head; skipping review dispatch."
           fi
@@ -553,6 +572,8 @@ jobs:
           ISSUE_TITLE: ${{ github.event.issue.title }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REVIEW_WF: ${{ inputs.review-workflow-file }}
+          MARK_READY: ${{ inputs.mark-ready-for-review }}
+          CLAUDE_OUTCOME: ${{ steps.claude.outcome }}
         run: |
           # Measure the tip of $BRANCH (not HEAD): the agent has git checkout/
           # switch in its toolset, so a stray detach would make HEAD diverge
@@ -603,6 +624,15 @@ jobs:
           # group dedupes a redundant dispatch).
           gh workflow run "$REVIEW_WF" -f pr_number="${PR_URL##*/}" \
             || echo "::warning::Could not dispatch $REVIEW_WF."
+          # Claude finished successfully with committed code: take the draft PR
+          # out of draft so a human knows it's ready to review. Gated on Claude's
+          # outcome because this step runs on always() to preserve partial work —
+          # a failed/incomplete run leaves the PR as a draft. `gh pr ready` is a
+          # no-op on an already-ready PR.
+          if [ "$MARK_READY" = "true" ] && [ "$CLAUDE_OUTCOME" = "success" ]; then
+            gh pr ready "$PR_URL" \
+              || echo "::warning::Could not mark $PR_URL ready for review."
+          fi
           gh issue comment "$ISSUE_NUMBER" --repo "${{ github.repository }}" \
             --body "Pushed Claude's commits to \`${BRANCH}\` and ${PR_VERB}: ${PR_URL}" \
             || echo "::warning::Could not post PR link as issue comment."
