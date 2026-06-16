@@ -22,8 +22,8 @@ name: Claude Code (reusable)
 #   - "Dispatch <review-workflow-file> on @claude review" routes review
 #     requests to the dedicated reviewer instead of self-reviewing.
 #   - When Claude finishes successfully with committed code, the post-steps
-#     take the draft PR out of draft (mark-ready-for-review) so a human knows
-#     it is ready to review.
+#     take the draft PR out of draft so a human knows it is ready to review
+#     (controlled by the mark-ready-for-review input).
 
 on:
   workflow_call:
@@ -630,8 +630,8 @@ jobs:
           # a failed/incomplete run leaves the PR as a draft. `gh pr ready` is a
           # no-op on an already-ready PR.
           if [ "$MARK_READY" = "true" ] && [ "$CLAUDE_OUTCOME" = "success" ]; then
-            gh pr ready "$PR_URL" \
-              || echo "::warning::Could not mark $PR_URL ready for review."
+            gh pr ready "${PR_URL##*/}" \
+              || echo "::warning::Could not mark PR #${PR_URL##*/} ready for review."
           fi
           gh issue comment "$ISSUE_NUMBER" --repo "${{ github.repository }}" \
             --body "Pushed Claude's commits to \`${BRANCH}\` and ${PR_VERB}: ${PR_URL}" \
