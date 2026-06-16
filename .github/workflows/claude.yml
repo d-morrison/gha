@@ -108,6 +108,16 @@ on:
         required: false
       SUBMODULES_TOKEN:
         required: false
+      # Token used for the git pushes (branches / commits). The integrated
+      # GITHUB_TOKEN cannot push commits that create or update files under
+      # `.github/workflows/` — GitHub rejects that without the `workflows`
+      # scope, which GITHUB_TOKEN never has. Set this to a PAT or GitHub App
+      # token with `contents:write` + `workflows:write` in repos where Claude
+      # edits workflow files (e.g. this repo dogfooding itself). When unset,
+      # pushes fall back to GITHUB_TOKEN, which is fine for repos that never
+      # touch `.github/workflows/`.
+      WORKFLOW_TOKEN:
+        required: false
 
 jobs:
   claude:
@@ -279,6 +289,7 @@ jobs:
           steps.issue_branch.outputs.existing_pr == ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUSH_TOKEN: ${{ secrets.WORKFLOW_TOKEN || secrets.GITHUB_TOKEN }}
           BRANCH: ${{ steps.issue_branch.outputs.branch }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
@@ -287,7 +298,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit --allow-empty -m "Start @claude work on #${ISSUE_NUMBER}"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH"
+          git push "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH"
           PR_BODY=$(printf 'Draft PR opened by `@claude` to address #%s (work in progress).\n\nTriggered by [workflow run](%s).\n\nAddresses #%s.\n' \
             "$ISSUE_NUMBER" "$RUN_URL" "$ISSUE_NUMBER")
           PR_TITLE="${ISSUE_TITLE:-Claude response to issue #${ISSUE_NUMBER}}"
@@ -368,6 +379,7 @@ jobs:
         if: always() && steps.pr_checkout.outputs.branch != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUSH_TOKEN: ${{ secrets.WORKFLOW_TOKEN || secrets.GITHUB_TOKEN }}
           BRANCH: ${{ steps.pr_checkout.outputs.branch }}
           STARTING_SHA: ${{ steps.pr_checkout.outputs.starting_sha }}
         run: |
@@ -386,7 +398,7 @@ jobs:
           # Explicit token URL: after `gh pr checkout` the persisted checkout
           # credential isn't reliably applied, so `git push origin` falls back
           # to unsupported password auth. The x-access-token URL always works.
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:$BRANCH"
+          git push "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:$BRANCH"
 
       - name: Capture PR head SHA after Claude
         id: head_after
@@ -531,6 +543,7 @@ jobs:
           steps.issue_branch.outputs.branch != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUSH_TOKEN: ${{ secrets.WORKFLOW_TOKEN || secrets.GITHUB_TOKEN }}
           BRANCH: ${{ steps.issue_branch.outputs.branch }}
           STARTING_SHA: ${{ steps.issue_branch.outputs.starting_sha }}
           SEED_SHA: ${{ steps.eager_pr.outputs.seed_sha }}
@@ -566,7 +579,7 @@ jobs:
           fi
 
           echo "Pushing $BRANCH ($BASELINE -> $CURRENT_SHA)"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH"
+          git push "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH"
 
           if [ -z "$PR_URL" ]; then
             # Lazy mode, first run: open the draft PR now that there are commits.
