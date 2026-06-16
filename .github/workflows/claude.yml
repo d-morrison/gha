@@ -629,8 +629,11 @@ jobs:
           # outcome because this step runs on always() to preserve partial work —
           # a failed/incomplete run leaves the PR as a draft. `gh pr ready` is a
           # no-op on an already-ready PR.
+          # On success, drop "draft " from PR_VERB so the issue comment below
+          # describes the PR's real (now-ready) state.
           if [ "$MARK_READY" = "true" ] && [ "$CLAUDE_OUTCOME" = "success" ]; then
             gh pr ready "${PR_URL##*/}" \
+              && PR_VERB="${PR_VERB/draft /}" \
               || echo "::warning::Could not mark PR #${PR_URL##*/} ready for review."
           fi
           gh issue comment "$ISSUE_NUMBER" --repo "${{ github.repository }}" \
