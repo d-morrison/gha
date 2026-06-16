@@ -12,7 +12,7 @@ on:
 
 # Never let two slides race; the most recent push wins.
 concurrency:
-  group: slide-major-tag
+  group: ${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
