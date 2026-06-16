@@ -15,12 +15,15 @@ name: Claude Code (reusable)
 # tag mode provides — so this workflow reproduces it with explicit pre/post
 # steps:
 #   - "Set up branch for issue trigger" creates claude/issue-N-<ts>.
-#   - "Push branch and open draft PR for issue trigger" pushes it + opens a
+#   - "Push branch and finalize PR for issue trigger" pushes it + opens a
 #     draft PR, so an @claude mention on an *issue* yields a PR.
 #   - "Post Claude's response if no code was committed" surfaces prose replies
 #     (questions/reviews) that agent mode would otherwise discard.
 #   - "Dispatch <review-workflow-file> on @claude review" routes review
 #     requests to the dedicated reviewer instead of self-reviewing.
+#   - When Claude finishes successfully with committed code, the post-steps
+#     take the draft PR out of draft so a human knows it is ready to review
+#     (controlled by the mark-ready-for-review input).
 
 on:
   workflow_call:
@@ -70,6 +73,13 @@ on:
         description: Workflow file (in the caller repo) dispatched to review Claude's commits.
         type: string
         default: 'claude-code-review.yml'
+      mark-ready-for-review:
+        description: >-
+          When Claude finishes successfully with committed code, take its draft
+          PR out of draft mode so a human knows it is ready to review. Set false
+          to leave Claude's PRs as drafts.
+        type: boolean
+        default: true
       prompt-addendum:
         description: Repo-specific instructions appended to Claude's prompt (e.g. the pre-commit checklist).
         type: string
@@ -299,7 +309,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit --allow-empty -m "Start @claude work on #${ISSUE_NUMBER}"
           git push "https://x-access-token:${PUSH_TOKEN}@github.com/${{ github.repository }}.git" "$BRANCH"
-          PR_BODY=$(printf 'Draft PR opened by `@claude` to address #%s (work in progress).\n\nTriggered by [workflow run](%s).\n\nAddresses #%s.\n' \
+          PR_BODY=$(printf 'PR opened by `@claude` to address #%s.\n\nTriggered by [workflow run](%s).\n\nAddresses #%s.\n' \
             "$ISSUE_NUMBER" "$RUN_URL" "$ISSUE_NUMBER")
           PR_TITLE="${ISSUE_TITLE:-Claude response to issue #${ISSUE_NUMBER}}"
           PR_URL=$(gh pr create \
@@ -517,6 +527,8 @@ jobs:
           SHA_AFTER: ${{ steps.head_after.outputs.sha }}
           REVIEWER: ${{ inputs.reviewer }}
           REVIEW_WF: ${{ inputs.review-workflow-file }}
+          MARK_READY: ${{ inputs.mark-ready-for-review }}
+          CLAUDE_OUTCOME: ${{ steps.claude.outcome }}
         run: |
           PR_NUMBER="${{ github.event.pull_request.number || github.event.issue.number }}"
           echo "before=$SHA_BEFORE  after=$SHA_AFTER"
@@ -528,6 +540,13 @@ jobs:
             fi
             gh workflow run "$REVIEW_WF" -f pr_number="$PR_NUMBER" \
               || echo "::warning::Could not dispatch $REVIEW_WF."
+            # Claude finished successfully with new commits: take the PR out of
+            # draft so a human knows it's ready to review. `gh pr ready` is a
+            # no-op on an already-ready PR.
+            if [ "$MARK_READY" = "true" ] && [ "$CLAUDE_OUTCOME" = "success" ]; then
+              gh pr ready "$PR_NUMBER" \
+                || echo "::warning::Could not mark PR #$PR_NUMBER ready for review."
+            fi
           else
             echo "No new commits on PR head; skipping review dispatch."
           fi
@@ -553,6 +572,8 @@ jobs:
           ISSUE_TITLE: ${{ github.event.issue.title }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REVIEW_WF: ${{ inputs.review-workflow-file }}
+          MARK_READY: ${{ inputs.mark-ready-for-review }}
+          CLAUDE_OUTCOME: ${{ steps.claude.outcome }}
         run: |
           # Measure the tip of $BRANCH (not HEAD): the agent has git checkout/
           # switch in its toolset, so a stray detach would make HEAD diverge
@@ -586,7 +607,7 @@ jobs:
             # "Addresses #N" (not "Closes #N") is deliberate: this is a draft of
             # Claude's attempt and may not fully resolve the issue, so merging it
             # should not auto-close the issue.
-            PR_BODY=$(printf 'Draft PR opened by `@claude` to address #%s.\n\nTriggered by [workflow run](%s).\n\nAddresses #%s.\n' \
+            PR_BODY=$(printf 'PR opened by `@claude` to address #%s.\n\nTriggered by [workflow run](%s).\n\nAddresses #%s.\n' \
               "$ISSUE_NUMBER" "$RUN_URL" "$ISSUE_NUMBER")
             PR_TITLE="${ISSUE_TITLE:-Claude response to issue #${ISSUE_NUMBER}}"
             PR_URL=$(gh pr create \
@@ -603,6 +624,20 @@ jobs:
           # group dedupes a redundant dispatch).
           gh workflow run "$REVIEW_WF" -f pr_number="${PR_URL##*/}" \
             || echo "::warning::Could not dispatch $REVIEW_WF."
+          # Claude finished successfully with committed code: take the draft PR
+          # out of draft so a human knows it's ready to review. Gated on Claude's
+          # outcome because this step runs on always() to preserve partial work —
+          # a failed/incomplete run leaves the PR as a draft. `gh pr ready` is a
+          # no-op on an already-ready PR.
+          # On success, drop "draft " from PR_VERB so the issue comment below
+          # describes the PR's real (now-ready) state.
+          if [ "$MARK_READY" = "true" ] && [ "$CLAUDE_OUTCOME" = "success" ]; then
+            if gh pr ready "${PR_URL##*/}"; then
+              PR_VERB="${PR_VERB/draft /}"
+            else
+              echo "::warning::Could not mark PR #${PR_URL##*/} ready for review."
+            fi
+          fi
           gh issue comment "$ISSUE_NUMBER" --repo "${{ github.repository }}" \
             --body "Pushed Claude's commits to \`${BRANCH}\` and ${PR_VERB}: ${PR_URL}" \
             || echo "::warning::Could not post PR link as issue comment."

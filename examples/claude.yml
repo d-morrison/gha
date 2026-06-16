@@ -34,6 +34,7 @@ jobs:
     #   use-renv: true              # restore deps with renv instead of DESCRIPTION
     #   checkout-submodules: true   # needs the SUBMODULES_TOKEN secret
     #   eager-pr: true              # open the draft PR up front (Copilot-style)
+    #   mark-ready-for-review: false # keep Claude's PRs as drafts
     #   reviewer: d-morrison        # re-requested when Claude pushes to a PR
     #   prompt-addendum: |
     #     This is the <name> R package. Before committing, run
