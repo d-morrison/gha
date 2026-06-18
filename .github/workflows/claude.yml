@@ -427,7 +427,10 @@ jobs:
         run: |
           if [ -d skills ]; then
             mkdir -p .claude
-            rm -rf .claude/skills
+            # rm -f (not -rf): clears a stale symlink/file but refuses to nuke a
+            # real committed .claude/skills directory — that errors visibly here
+            # rather than silently destroying it.
+            rm -f .claude/skills
             ln -s ../skills .claude/skills
             echo "Linked .claude/skills -> ../skills ($(ls -1 skills | wc -l | tr -d ' ') skills)."
           else
