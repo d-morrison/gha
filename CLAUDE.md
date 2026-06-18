@@ -35,7 +35,7 @@ This repo is `d-morrison/gha`, so MCP calls use `owner: d-morrison`, `repo: gha`
 | post inline review comments | `mcp__github__pull_request_review_write` (`method: create`, no `event`) → `mcp__github__add_comment_to_pending_review` per comment → `mcp__github__pull_request_review_write` (`method: submit_pending`) |
 | reply to a review comment | `mcp__github__add_reply_to_pull_request_comment` |
 | approve / request changes | `mcp__github__pull_request_review_write` (`method: create` with `event`) |
-| resolve a review thread | `mcp__github__pull_request_review_write` (`method: resolve_thread`, `threadId`) |
+| resolve a review thread | `mcp__github__pull_request_review_write` (`method: resolve_thread`, `threadId: <id from get_review_comments>`) |
 | `gh issue list` / `gh issue view <n>` | `mcp__github__list_issues` / `mcp__github__issue_read` |
 | read a file / repo contents | `mcp__github__get_file_contents` |
 | CI runs & job logs | `mcp__github__actions_list`, `mcp__github__actions_get`, `mcp__github__get_job_logs` |
