@@ -32,10 +32,13 @@ jobs:
     #   setup-r: true               # default; set false for non-R repos
     #   install-quarto: true        # for Quarto books
     #   use-renv: true              # restore deps with renv instead of DESCRIPTION
+    #   apt-packages: jags libglpk-dev poppler-utils  # system libs deps need
+    #   pip-packages: sympy         # pip3 --break-system-packages
     #   checkout-submodules: true   # needs the SUBMODULES_TOKEN secret
     #   eager-pr: true              # open the draft PR up front (Copilot-style)
     #   mark-ready-for-review: false # keep Claude's PRs as drafts
     #   reviewer: d-morrison        # re-requested when Claude pushes to a PR
+    #   webfetch-allowlist-url: https://raw.githubusercontent.com/d-morrison/stats-allowlist/main/allowlist.txt
     #   prompt-addendum: |
     #     This is the <name> R package. Before committing, run
     #     lintr::lint_package(), spelling::spell_check_package(), and
