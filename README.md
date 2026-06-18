@@ -70,6 +70,9 @@ that need to write must have the **caller** grant it on the calling job:
     touch `.github/workflows/` can omit it; pushes fall back to `GITHUB_TOKEN`.
     Note that, unlike `GITHUB_TOKEN`, a PAT/App-token push **does** trigger other
     `push`-based workflows, so enabling `WORKFLOW_TOKEN` can set off extra CI runs.
+  - **Optional:** set `checkout-submodules: true` so Claude can read submodule
+    contents. Public submodules clone anonymously; private ones additionally need
+    a `SUBMODULES_TOKEN` secret.
 - `claude-code-review` (read-only review) → grant `contents: read`,
   `pull-requests: write`, `issues: write`, `id-token: write`, and the
   `CLAUDE_CODE_OAUTH_TOKEN` secret.
