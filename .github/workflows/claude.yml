@@ -68,7 +68,9 @@ on:
         type: string
         default: '1'
       checkout-submodules:
-        description: Check out private submodules using the SUBMODULES_TOKEN secret.
+        description: >-
+          Check out submodules. Private submodules require the SUBMODULES_TOKEN
+          secret; public submodules clone anonymously without it.
         type: boolean
         default: false
       eager-pr:
@@ -201,20 +203,23 @@ jobs:
           fetch-depth: 1
           submodules: false
 
-      # Private submodules need a token with read access; the URL rewrite is
-      # the cleanest way to pass it through `git submodule update`.
+      # Private submodules need a token with read access; when SUBMODULES_TOKEN
+      # is set, the URL rewrite authenticates the clone. Without a token,
+      # submodules clone anonymously (public ones work; a private one fails
+      # naturally at checkout).
       - name: Checkout submodules
         if: inputs.checkout-submodules
         env:
           SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
         run: |
-          # Fail fast with a clear message: an empty token would rewrite the
-          # URL with no credentials and surface as a confusing auth error.
+          # With a token, rewrite submodule URLs to authenticate the clone.
+          # Without one, warn and proceed: public submodules clone anonymously,
+          # and a truly private submodule will fail naturally at checkout.
           if [ -z "$SUBMODULES_TOKEN" ]; then
-            echo "::error::checkout-submodules is enabled but the SUBMODULES_TOKEN secret is empty. Pass it via 'secrets: inherit' (or set the secret), or set checkout-submodules: false."
-            exit 1
+            echo "::warning::SUBMODULES_TOKEN is empty; cloning submodules anonymously (works for public submodules only)."
+          else
+            git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
-          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           git submodule update --init --recursive --depth 1
 
       # System libraries some R/Quarto packages need to compile or run (e.g.

@@ -29,6 +29,6 @@ jobs:
       # a review on Claude's commits; empty (and ignored) for pull_request runs.
       pr-number: ${{ inputs.pr_number }}
     # with:
-    #   checkout-submodules: true   # needs the SUBMODULES_TOKEN secret
+    #   checkout-submodules: true   # SUBMODULES_TOKEN secret only for private submodules
     #   prompt-addendum: |
     #     Repo-specific review guidance (e.g. Quarto/R conventions to enforce).

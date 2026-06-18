@@ -25,9 +25,10 @@ on:
         default: ''
       checkout-submodules:
         description: >-
-          Check out submodules (using the SUBMODULES_TOKEN secret) so the
-          reviewer can read their contents instead of reporting them as "not
-          initialized". Needed for repos whose analyses reference a submodule.
+          Check out submodules so the reviewer can read their contents instead
+          of reporting them as "not initialized". Needed for repos whose
+          analyses reference a submodule. Private submodules require the
+          SUBMODULES_TOKEN secret; public submodules clone anonymously without it.
         type: boolean
         default: false
     secrets:
@@ -81,18 +82,22 @@ jobs:
 
       # Initialize submodules so the reviewer can read their contents — without
       # this, reviews of files that include or reference a submodule report it
-      # as "not initialized". The insteadOf rule authenticates the clone with
-      # SUBMODULES_TOKEN (the default GITHUB_TOKEN can't read private submodules).
+      # as "not initialized". When SUBMODULES_TOKEN is set, the insteadOf rule
+      # authenticates the clone (the default GITHUB_TOKEN can't read private
+      # submodules); otherwise submodules clone anonymously.
       - name: Checkout submodules
         if: inputs.checkout-submodules
         env:
           SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
         run: |
+          # With a token, rewrite submodule URLs to authenticate the clone.
+          # Without one, warn and proceed: public submodules clone anonymously,
+          # and a truly private submodule will fail naturally at checkout.
           if [ -z "$SUBMODULES_TOKEN" ]; then
-            echo "::error::checkout-submodules is enabled but the SUBMODULES_TOKEN secret is empty. Pass it via 'secrets: inherit' (or set the secret), or set checkout-submodules: false."
-            exit 1
+            echo "::warning::SUBMODULES_TOKEN is empty; cloning submodules anonymously (works for public submodules only)."
+          else
+            git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
-          git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           git submodule update --init --recursive --depth 1
 
       # Clear the human reviewers before Claude runs so they aren't notified

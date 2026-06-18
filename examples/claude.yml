@@ -43,7 +43,7 @@ jobs:
     #   use-renv: true              # restore deps with renv instead of DESCRIPTION
     #   apt-packages: jags libglpk-dev poppler-utils  # system libs deps need
     #   pip-packages: sympy         # pip3 --break-system-packages
-    #   checkout-submodules: true   # needs the SUBMODULES_TOKEN secret
+    #   checkout-submodules: true   # SUBMODULES_TOKEN secret only for private submodules
     #   eager-pr: true              # open the draft PR up front (Copilot-style)
     #   mark-ready-for-review: false # keep Claude's PRs as drafts
     #   reviewer: d-morrison        # re-requested when Claude pushes to a PR
