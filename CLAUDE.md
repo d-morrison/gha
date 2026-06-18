@@ -27,24 +27,25 @@ This repo is `d-morrison/gha`, so MCP calls use `owner: d-morrison`, `repo: gha`
 | `gh pr view <n>` | `mcp__github__pull_request_read` (`method: get`) |
 | `gh pr diff <n>` | `mcp__github__pull_request_read` (`method: get_diff`) |
 | changed files in a PR | `mcp__github__pull_request_read` (`method: get_files`) |
-| `gh pr status` / `gh pr checks` | `pull_request_read` (`method: get_status` / `get_check_runs`) |
+| `gh pr status` / `gh pr checks` | `mcp__github__pull_request_read` (`method: get_status` / `get_check_runs`) |
 | `gh pr create` | `mcp__github__create_pull_request` |
-| read PR conversation comments | `pull_request_read` (`method: get_comments`) |
-| read inline review comments | `pull_request_read` (`method: get_review_comments`) — also returns `threadId`s |
+| read PR conversation comments | `mcp__github__pull_request_read` (`method: get_comments`) |
+| read inline review comments | `mcp__github__pull_request_read` (`method: get_review_comments`) — also returns `threadId`s |
 | post a top-level PR comment | `mcp__github__add_issue_comment` |
-| post inline review comments | `pull_request_review_write` (`method: create`, no `event`) → `add_comment_to_pending_review` per comment → `pull_request_review_write` (`method: submit_pending`) |
+| post inline review comments | `mcp__github__pull_request_review_write` (`method: create`, no `event`) → `mcp__github__add_comment_to_pending_review` per comment → `mcp__github__pull_request_review_write` (`method: submit_pending`) |
 | reply to a review comment | `mcp__github__add_reply_to_pull_request_comment` |
-| approve / request changes | `pull_request_review_write` (`method: create` with `event`) |
-| resolve a review thread | `pull_request_review_write` (`method: resolve_thread`, `threadId`) |
+| approve / request changes | `mcp__github__pull_request_review_write` (`method: create` with `event`) |
+| resolve a review thread | `mcp__github__pull_request_review_write` (`method: resolve_thread`, `threadId`) |
 | `gh issue list` / `gh issue view <n>` | `mcp__github__list_issues` / `mcp__github__issue_read` |
 | read a file / repo contents | `mcp__github__get_file_contents` |
 | CI runs & job logs | `mcp__github__actions_list`, `mcp__github__actions_get`, `mcp__github__get_job_logs` |
 | `glab mr ...` (GitLab) | N/A — this repo is on GitHub; use the tools above |
 
 Posting inline comments requires a **pending review to already exist** before
-`add_comment_to_pending_review`; create the pending review first, add each
-comment, then submit once at the end. Watch and respond to PR activity with
-`subscribe_pr_activity` / `unsubscribe_pr_activity` (not `gh pr checks --watch`).
+`mcp__github__add_comment_to_pending_review`; create the pending review first, add
+each comment, then submit once at the end. Watch and respond to PR activity with
+`mcp__github__subscribe_pr_activity` / `mcp__github__unsubscribe_pr_activity` (not
+`gh pr checks --watch`).
 
 ## Code review guidelines
 
