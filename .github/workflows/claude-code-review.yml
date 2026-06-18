@@ -82,8 +82,9 @@ jobs:
 
       # Initialize submodules so the reviewer can read their contents — without
       # this, reviews of files that include or reference a submodule report it
-      # as "not initialized". The insteadOf rule authenticates the clone with
-      # SUBMODULES_TOKEN (the default GITHUB_TOKEN can't read private submodules).
+      # as "not initialized". When SUBMODULES_TOKEN is set, the insteadOf rule
+      # authenticates the clone (the default GITHUB_TOKEN can't read private
+      # submodules); otherwise submodules clone anonymously.
       - name: Checkout submodules
         if: inputs.checkout-submodules
         env:
