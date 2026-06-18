@@ -40,7 +40,10 @@ import sys
 from pathlib import Path
 from typing import Callable, Dict, List, NamedTuple, Optional, Tuple
 
-INLINE_PRAGMA = "phi-allow"
+# Word-boundary match so the pragma "phi-allow" does NOT also fire on lines
+# that merely mention "phi-allowlist" (e.g. a path like .github/phi-allowlist.txt
+# in a consumer's YAML), which would silently exclude those lines from scanning.
+INLINE_PRAGMA_RE = re.compile(r"\bphi-allow\b", re.IGNORECASE)
 DEFAULT_ALLOWLIST = ".github/phi-allowlist.txt"
 DEFAULT_DETECTORS = ("ssn", "mrn", "dob", "csv_phi_header")
 CSV_SUFFIXES = (".csv", ".tsv", ".psv")
@@ -246,7 +249,7 @@ def _tracked_files() -> List[str]:
 
 
 def _scan_lines_all(ignores: List["re.Pattern[str]"]) -> List[Tuple[str, int, str]]:
-    """Yield (path, lineno, text) for every line of every tracked text file."""
+    """Return (path, lineno, text) for every line of every tracked text file."""
     rows = []
     for rel in _tracked_files():
         if _ignored(rel, ignores):
@@ -267,7 +270,7 @@ _HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
 def _scan_lines_diff(base_ref: str, ignores: List["re.Pattern[str]"]) -> Optional[List[Tuple[str, int, str]]]:
-    """Yield (path, lineno, text) for lines *added* relative to base_ref.
+    """Return (path, lineno, text) for lines *added* relative to base_ref.
     Returns None if the diff could not be computed (caller falls back to all).
 
     NOTE: the line-number bookkeeping below assumes ``--unified=0`` (no context
@@ -306,7 +309,7 @@ def _scan_lines_diff(base_ref: str, ignores: List["re.Pattern[str]"]) -> Optiona
 
 # ── Allowlisting ────────────────────────────────────────────────────────────
 
-def _load_allowlist(path: str) -> List[re.Pattern]:
+def _load_allowlist(path: str) -> List["re.Pattern[str]"]:
     if not path:
         return []
     if not os.path.isfile(path):
@@ -374,7 +377,7 @@ def main() -> int:
         # an allowlist regex matching anywhere on the line suppresses *every*
         # detector hit on that line (not just one match). This is intentional —
         # narrow it to per-match only if that model ever proves too coarse.
-        if INLINE_PRAGMA in text.lower():
+        if INLINE_PRAGMA_RE.search(text):
             continue
         if allow and any(p.search(text) for p in allow):
             continue
