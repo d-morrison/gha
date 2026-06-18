@@ -226,13 +226,16 @@ jobs:
           APT_PACKAGES: ${{ inputs.apt-packages }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y $APT_PACKAGES
+          # Pipe through xargs rather than unquoted word-splitting so any shell
+          # metacharacters in the input are passed to apt-get as literal args
+          # (which it rejects) instead of being interpreted by the shell.
+          echo "$APT_PACKAGES" | xargs sudo apt-get install -y
 
       - name: Install pip packages
         if: inputs.pip-packages != ''
         env:
           PIP_PACKAGES: ${{ inputs.pip-packages }}
-        run: pip3 install --break-system-packages $PIP_PACKAGES
+        run: echo "$PIP_PACKAGES" | xargs pip3 install --break-system-packages
 
       - name: Set up pandoc
         if: inputs.setup-r
@@ -474,6 +477,17 @@ jobs:
           BRANCH: ${{ steps.pr_checkout.outputs.branch }}
           STARTING_SHA: ${{ steps.pr_checkout.outputs.starting_sha }}
         run: |
+          # Sweep changes Claude staged or left untracked but never committed so
+          # they aren't dropped (uncommitted edits never advance HEAD, and the
+          # push below only fires when HEAD moved). Mirrors the issue-trigger
+          # finalize step. HEAD is the PR's checked-out head branch here.
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "claude[bot]"
+            git config user.email "claude[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore: auto-commit residual @claude session changes" \
+              || { echo "::error::auto-commit of residual @claude changes failed"; exit 1; }
+          fi
           CURRENT_SHA=$(git rev-parse HEAD)
           if [ "$CURRENT_SHA" = "$STARTING_SHA" ]; then
             echo "No new commits on the PR branch; nothing to push."
