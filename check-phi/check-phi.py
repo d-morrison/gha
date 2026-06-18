@@ -139,7 +139,7 @@ def _detect_email(path: str, lineno: int, line: str) -> List[Tuple[int, str]]:
 # "address" are common in non-PHI CSVs (mailing lists, config, IP/contract
 # addresses) and would erode the high-precision design goal. Enable the `phone`
 # and `email` line detectors, or extend this set in a fork, if you need them.
-_PHI_HEADER_TOKENS = {
+_PHI_HEADER_TOKENS = frozenset({
     "ssn", "socialsecurity", "socialsecuritynumber",
     "mrn", "medicalrecordnumber", "medicalrecordno",
     "patientname", "patientid", "patientfirstname", "patientlastname",
@@ -147,7 +147,7 @@ _PHI_HEADER_TOKENS = {
     "homeaddress", "streetaddress", "mailingaddress",
     "homephone", "phonenumber", "cellphone",
     "emailaddress",
-}
+})
 
 
 def _detect_csv_phi_header(path: str, lineno: int, line: str) -> List[Tuple[int, str]]:
@@ -178,8 +178,12 @@ DETECTORS: Dict[str, Callable[[str, int, str], List[Tuple[int, str]]]] = {
 
 def _run_git(args: List[str]) -> Optional[str]:
     try:
+        # Force UTF-8 with errors="replace" rather than relying on the runner
+        # locale, so non-ASCII filenames/content in a diff can't raise an
+        # uncaught UnicodeDecodeError and abort the scan.
         return subprocess.run(
-            ["git", *args], capture_output=True, text=True, check=True
+            ["git", *args], capture_output=True, check=True,
+            encoding="utf-8", errors="replace",
         ).stdout
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None

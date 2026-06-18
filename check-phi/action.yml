@@ -50,4 +50,6 @@ runs:
         PHI_FAIL: ${{ inputs.fail }}
       run: |
         set -euo pipefail
-        python3 "$GITHUB_ACTION_PATH/check-phi.py"
+        # -u: unbuffered, so the header and findings stream to the live CI log
+        # instead of appearing only at exit (stdout is block-buffered when piped).
+        python3 -u "$GITHUB_ACTION_PATH/check-phi.py"
