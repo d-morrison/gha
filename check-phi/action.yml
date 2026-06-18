@@ -15,7 +15,9 @@ inputs:
       (ssn, mrn, dob, csv_phi_header). Also available: phone, email.
     default: ''
   paths-ignore:
-    description: Comma/newline-separated glob patterns (relative paths) to skip.
+    description: >-
+      Comma/newline-separated glob patterns (relative paths) to skip. Supports
+      `*`, `?`, and recursive `**` (e.g. `tests/fixtures/**`).
     default: ''
   allowlist-file:
     description: >-

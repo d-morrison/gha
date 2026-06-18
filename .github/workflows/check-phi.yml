@@ -14,7 +14,9 @@ on:
         type: string
         default: ''
       paths-ignore:
-        description: Comma/newline-separated glob patterns (relative paths) to skip.
+        description: >-
+          Comma/newline-separated glob patterns (relative paths) to skip;
+          supports `*`, `?`, and recursive `**`.
         type: string
         default: ''
       allowlist-file:

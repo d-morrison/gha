@@ -33,7 +33,6 @@ Inline suppression: any line containing the token ``phi-allow`` (e.g. a
 ``# phi-allow`` trailing comment) is skipped entirely.
 """
 
-import fnmatch
 import os
 import re
 import subprocess
@@ -133,6 +132,10 @@ def _detect_email(path: str, lineno: int, line: str) -> List[Tuple[int, str]]:
 
 # PHI-suggestive column headers in delimited data files. Tokens are normalized
 # (lowercased, non-alphanumerics stripped) before comparison.
+# Deliberately compound/person-anchored forms only: bare "email", "phone", and
+# "address" are common in non-PHI CSVs (mailing lists, config, IP/contract
+# addresses) and would erode the high-precision design goal. Enable the `phone`
+# and `email` line detectors, or extend this set in a fork, if you need them.
 _PHI_HEADER_TOKENS = {
     "ssn", "socialsecurity", "socialsecuritynumber",
     "mrn", "medicalrecordnumber", "medicalrecordno",
@@ -187,11 +190,46 @@ def _looks_binary(path: Path) -> bool:
         return True
 
 
-def _ignored(rel: str, patterns: List[str]) -> bool:
-    return any(
-        fnmatch.fnmatch(rel, pat) or fnmatch.fnmatch(rel, f"{pat.rstrip('/')}/*")
-        for pat in patterns
-    )
+def _glob_to_regex(pat: str) -> "re.Pattern[str]":
+    """Translate a path glob to an anchored regex. Supports ``**`` (any number
+    of path segments — the recursive form GitHub's native ``paths-ignore``
+    users expect), ``*`` (within a single segment), and ``?``. ``fnmatch`` is
+    not used because it treats ``**`` as two literal ``*`` (non-recursive)."""
+    i, n, out = 0, len(pat), []
+    while i < n:
+        c = pat[i]
+        if c == "*":
+            if pat[i:i + 2] == "**":
+                i += 2
+                if pat[i:i + 1] == "/":
+                    out.append("(?:.*/)?")  # **/  => zero or more leading dirs
+                    i += 1
+                else:
+                    out.append(".*")
+            else:
+                out.append("[^/]*")  # * stays within one path segment
+                i += 1
+        elif c == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(c))
+            i += 1
+    return re.compile("^" + "".join(out) + "$")
+
+
+def _compile_ignores(patterns: List[str]) -> List["re.Pattern[str]"]:
+    # For each pattern also accept "<pattern>/**" so a bare directory name
+    # ignores everything beneath it (e.g. "docs" also skips "docs/x/y.csv").
+    compiled = []
+    for pat in patterns:
+        compiled.append(_glob_to_regex(pat))
+        compiled.append(_glob_to_regex(pat.rstrip("/") + "/**"))
+    return compiled
+
+
+def _ignored(rel: str, ignores: List["re.Pattern[str]"]) -> bool:
+    return any(r.match(rel) for r in ignores)
 
 
 def _tracked_files() -> List[str]:
@@ -207,11 +245,11 @@ def _tracked_files() -> List[str]:
     return files
 
 
-def _scan_lines_all(patterns: List[str]) -> List[Tuple[str, int, str]]:
+def _scan_lines_all(ignores: List["re.Pattern[str]"]) -> List[Tuple[str, int, str]]:
     """Yield (path, lineno, text) for every line of every tracked text file."""
     rows = []
     for rel in _tracked_files():
-        if _ignored(rel, patterns):
+        if _ignored(rel, ignores):
             continue
         p = Path(rel)
         if not p.is_file() or _looks_binary(p):
@@ -228,9 +266,14 @@ def _scan_lines_all(patterns: List[str]) -> List[Tuple[str, int, str]]:
 _HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
-def _scan_lines_diff(base_ref: str, patterns: List[str]) -> Optional[List[Tuple[str, int, str]]]:
+def _scan_lines_diff(base_ref: str, ignores: List["re.Pattern[str]"]) -> Optional[List[Tuple[str, int, str]]]:
     """Yield (path, lineno, text) for lines *added* relative to base_ref.
-    Returns None if the diff could not be computed (caller falls back to all)."""
+    Returns None if the diff could not be computed (caller falls back to all).
+
+    NOTE: the line-number bookkeeping below assumes ``--unified=0`` (no context
+    lines, so every non-``+++`` ``+`` line is an addition to count). If the
+    context value ever changes, the increment logic must account for context
+    lines too."""
     diff = _run_git(["diff", "--unified=0", "--no-color", f"{base_ref}...HEAD"])
     if diff is None:
         return None
@@ -240,14 +283,22 @@ def _scan_lines_diff(base_ref: str, patterns: List[str]) -> Optional[List[Tuple[
     for raw in diff.splitlines():
         if raw.startswith("+++ "):
             target = raw[4:]
-            cur_path = None if target == "/dev/null" else target[2:]  # strip "b/"
+            if target == "/dev/null":
+                cur_path = None  # file deleted — nothing added to scan
+            else:
+                cur_path = target[2:]  # strip "b/"
+                # Skip ignored or binary files, for parity with whole-tree
+                # scanning. (git already omits "+"-content for binary files, so
+                # the binary guard is defensive.)
+                if _ignored(cur_path, ignores) or _looks_binary(Path(cur_path)):
+                    cur_path = None
             continue
         if raw.startswith("@@"):
             m = _HUNK_RE.match(raw)
             new_lineno = int(m.group(1)) if m else 0
             continue
         if raw.startswith("+") and not raw.startswith("+++"):
-            if cur_path is not None and not _ignored(cur_path, patterns):
+            if cur_path is not None:
                 rows.append((cur_path, new_lineno, raw[1:] + "\n"))
             new_lineno += 1
     return rows
@@ -256,7 +307,13 @@ def _scan_lines_diff(base_ref: str, patterns: List[str]) -> Optional[List[Tuple[
 # ── Allowlisting ────────────────────────────────────────────────────────────
 
 def _load_allowlist(path: str) -> List[re.Pattern]:
-    if not path or not os.path.isfile(path):
+    if not path:
+        return []
+    if not os.path.isfile(path):
+        # main() only assigns the default path when it exists, so reaching here
+        # means a consumer pointed allowlist-file at a path that isn't there.
+        print(f"::warning::PHI allowlist file '{path}' not found; "
+              f"no allowlist applied.")
         return []
     pats = []
     with open(path, "r", encoding="utf-8") as f:
@@ -288,7 +345,7 @@ def main() -> int:
         return 1
     active = [(name, DETECTORS[name]) for name in enabled]
 
-    ignore = _split_list(os.environ.get("PHI_PATHS_IGNORE", ""))
+    ignore = _compile_ignores(_split_list(os.environ.get("PHI_PATHS_IGNORE", "")))
     fail = os.environ.get("PHI_FAIL", "true").strip().lower() != "false"
 
     allowlist_file = os.environ.get("PHI_ALLOWLIST_FILE", "").strip()
@@ -313,6 +370,10 @@ def main() -> int:
 
     findings: List[Finding] = []
     for path, lineno, text in rows:
+        # The line is the unit of suppression: an inline `phi-allow` pragma or
+        # an allowlist regex matching anywhere on the line suppresses *every*
+        # detector hit on that line (not just one match). This is intentional —
+        # narrow it to per-match only if that model ever proves too coarse.
         if INLINE_PRAGMA in text.lower():
             continue
         if allow and any(p.search(text) for p in allow):

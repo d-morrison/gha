@@ -22,7 +22,20 @@ jobs:
     uses: ./.github/workflows/check-bibliography-dois.yml
     with:
       no-metadata-check: true
+  # check-phi is brand new, so it doesn't exist at the released `@v1` tag the
+  # reusable workflow pins yet. Exercise the local composite directly so the
+  # selftest covers the actual PR code (and stays green pre-release); consumers
+  # use the reusable workflow once `@v1` includes the action.
   phi:
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-    uses: ./.github/workflows/check-phi.yml
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for PHI
+        uses: ./check-phi
+        with:
+          base-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
