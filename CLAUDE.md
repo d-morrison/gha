@@ -21,7 +21,7 @@ where `gh` is on `PATH`, use `gh` as the skill describes.)
 
 This repo is `d-morrison/gha`, so MCP calls use `owner: d-morrison`, `repo: gha`.
 
-| `gh`/`glab` command | GitHub MCP equivalent |
+| Operation / `gh`/`glab` command | GitHub MCP equivalent |
 | --- | --- |
 | `gh pr list` | `mcp__github__list_pull_requests` |
 | `gh pr view <n>` | `mcp__github__pull_request_read` (`method: get`) |
