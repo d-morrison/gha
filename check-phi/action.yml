@@ -1,0 +1,51 @@
+name: Check for PHI
+description: >-
+  Scan the caller's repository for content that looks like Protected Health
+  Information (Social Security numbers, medical record numbers, dates of birth,
+  PHI column headers in data files). On pull requests only the added lines are
+  scanned; otherwise the whole tracked tree is scanned. Matched values are
+  never printed to the log.
+inputs:
+  python-version:
+    description: Python version to set up.
+    default: '3.x'
+  detectors:
+    description: >-
+      Comma-separated detector set to run, overriding the default
+      (ssn, mrn, dob, csv_phi_header). Also available: phone, email.
+    default: ''
+  paths-ignore:
+    description: Comma/newline-separated glob patterns (relative paths) to skip.
+    default: ''
+  allowlist-file:
+    description: >-
+      Path (in the caller repo) to a file of regexes; a match whose text matches
+      any regex is suppressed. Defaults to .github/phi-allowlist.txt if present.
+    default: ''
+  base-ref:
+    description: >-
+      Git ref/SHA to diff against; when set, only added lines are scanned. The
+      reusable workflow passes the PR base SHA automatically.
+    default: ''
+  fail:
+    description: Fail the action when possible PHI is found (else warn only).
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Scan for PHI
+      shell: bash
+      env:
+        PHI_DETECTORS: ${{ inputs.detectors }}
+        PHI_PATHS_IGNORE: ${{ inputs.paths-ignore }}
+        PHI_ALLOWLIST_FILE: ${{ inputs.allowlist-file }}
+        PHI_BASE_REF: ${{ inputs.base-ref }}
+        PHI_FAIL: ${{ inputs.fail }}
+      run: |
+        set -euo pipefail
+        python3 "$GITHUB_ACTION_PATH/check-phi.py"

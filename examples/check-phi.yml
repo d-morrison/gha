@@ -1,0 +1,27 @@
+# Copy to .github/workflows/check-phi.yml in your repo.
+# Scans pull requests for content that looks like Protected Health Information
+# (SSNs, medical record numbers, dates of birth, PHI column headers in data
+# files). On PRs only the added lines are scanned; on push the whole tree is.
+# Only contents:read is needed (the default), so no permissions block is required.
+name: Check for PHI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    uses: d-morrison/gha/.github/workflows/check-phi.yml@v1
+    # with:
+    #   detectors: 'ssn,mrn,dob,csv_phi_header,phone,email'  # add phone/email
+    #   paths-ignore: 'tests/testthat/fixtures/*,docs/*'      # skip known-safe paths
+    #   allowlist-file: '.github/phi-allowlist.txt'           # regexes to suppress
+    #   fail: false                                           # warn instead of failing
+#
+# Suppressing false positives:
+#   - Add a `phi-allow` comment on the offending line, or
+#   - List a regex matching the synthetic value in the allowlist file
+#     (defaults to .github/phi-allowlist.txt when present).

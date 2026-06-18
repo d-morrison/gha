@@ -13,6 +13,12 @@ below with migration steps.
 
 ### Added
 
+- `check-phi` — scans pull requests (added lines only; whole tree on `push`)
+  for content that looks like PHI: US Social Security numbers, medical record
+  numbers, dates of birth, and PHI-suggestive column headers in delimited data
+  files. Matched values are never printed to the log; false positives are
+  suppressed via a `phi-allow` line comment or a regex allowlist file. The
+  `phone`/`email` detectors are available but off by default.
 - `CHANGELOG.md` (this file) — records what changes as the `@v1` tag moves, so
   consumers can see what they picked up.
 - `REVDEPS.md` — tracks repos that consume these workflows so breaking changes

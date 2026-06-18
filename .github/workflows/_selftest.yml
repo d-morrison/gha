@@ -22,3 +22,7 @@ jobs:
     uses: ./.github/workflows/check-bibliography-dois.yml
     with:
       no-metadata-check: true
+  phi:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/check-phi.yml

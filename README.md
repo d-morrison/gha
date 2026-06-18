@@ -42,6 +42,7 @@ Pin to `@v1` (a moving major tag updated as fixes land). Do not reference
 |---|---|---|
 | `check-bibliography-dois.yml` | Validate book/article BibTeX entries have resolvable DOIs matching CrossRef metadata | `exclude-keys`, `install-quarto`, `no-metadata-check` |
 | `check-non-standard-chars.yml` | Detect curly quotes / en–em dashes in `.qmd` and `.R` files | `python-version` |
+| `check-phi.yml` | Scan PRs (added lines only) for content that looks like PHI — SSNs, medical record numbers, dates of birth, PHI column headers in data files | `detectors`, `paths-ignore`, `allowlist-file`, `fail` |
 | `check-links.yml` | lychee link check with bundled config, PR skip-label, and auto-issue on `main` | `lychee-config`, `lychee-args`, `create-issue-on-main`, `skip-label` |
 | `summary.yml` | AI summary comment on newly opened issues | — |
 | `check-news.yml` | Enforce a `NEWS.md` changelog entry on PRs (wraps `UCD-SERG/changelog-check-action`) | `changelog` |
@@ -58,8 +59,8 @@ that need to write must have the **caller** grant it on the calling job:
   `pull-requests: read`, `contents: read`.
 - `summary` (comments on issues, calls the models API) → grant `issues: write`,
   `models: read`, `contents: read`.
-- `check-bibliography-dois`, `check-non-standard-chars` → only `contents: read`
-  (the default), so no `permissions:` block is needed.
+- `check-bibliography-dois`, `check-non-standard-chars`, `check-phi` → only
+  `contents: read` (the default), so no `permissions:` block is needed.
 - `claude` (pushes branches, opens PRs, dispatches the review workflow) → grant
   `contents: write`, `pull-requests: write`, `issues: write`, `id-token: write`,
   `actions: write`, and add the `CLAUDE_CODE_OAUTH_TOKEN` secret.
@@ -89,6 +90,28 @@ Claude pushes) routes through `claude.yml`, which dispatches `claude-code-review
 via `workflow_dispatch`. Install both, and keep the review stub named
 `claude-code-review.yml` (or set `claude.yml`'s `review-workflow-file` input to
 match) so the dispatch resolves.
+
+## PHI scanning (`check-phi`)
+
+`check-phi` is a **heuristic tripwire, not a HIPAA compliance tool.** It flags
+patterns that should almost never be committed — US Social Security numbers,
+medical record numbers, dates of birth, and PHI-suggestive column headers in
+delimited data files (`.csv`/`.tsv`/`.psv`) — so a human reviews before the
+data merges. It is tuned for high precision (few false positives), so it will
+miss free-text PHI such as patient names. The `phone` and `email` detectors
+exist but are **off by default** (too noisy in source); enable them via the
+`detectors` input.
+
+- **Diff-scoped on PRs.** Only lines *added* by the PR are scanned, so existing
+  fixtures don't re-trip the check on unrelated edits. `push` runs scan the
+  whole tracked tree (`git ls-files`).
+- **Values are never printed.** A leaked identifier in a CI log is still a leak,
+  so findings report only `file:line:col` and the detector name — never the
+  matched text. Findings appear as inline annotations on the PR.
+- **Suppressing false positives** (e.g. synthetic test data): add a `phi-allow`
+  comment on the line, or list a regex matching the value in an allowlist file
+  (defaults to `.github/phi-allowlist.txt` when present; override with the
+  `allowlist-file` input). Use `fail: false` to downgrade to warnings.
 
 ## Versioning
 
