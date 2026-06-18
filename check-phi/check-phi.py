@@ -222,12 +222,15 @@ def _glob_to_regex(pat: str) -> "re.Pattern[str]":
 
 
 def _compile_ignores(patterns: List[str]) -> List["re.Pattern[str]"]:
-    # For each pattern also accept "<pattern>/**" so a bare directory name
-    # ignores everything beneath it (e.g. "docs" also skips "docs/x/y.csv").
     compiled = []
     for pat in patterns:
         compiled.append(_glob_to_regex(pat))
-        compiled.append(_glob_to_regex(pat.rstrip("/") + "/**"))
+        # Bare names (no wildcards) also get an "everything beneath" expansion,
+        # so a directory like "docs" skips "docs/x/y.csv". Patterns that already
+        # use wildcards keep GitHub paths-ignore semantics — "tests/*" stays a
+        # single segment rather than silently becoming recursive.
+        if "*" not in pat and "?" not in pat:
+            compiled.append(_glob_to_regex(pat.rstrip("/") + "/**"))
     return compiled
 
 

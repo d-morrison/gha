@@ -38,4 +38,7 @@ jobs:
       - name: Check for PHI
         uses: ./check-phi
         with:
+          # Run every detector (incl. the off-by-default phone/email) so CI
+          # exercises them all; this repo's tree is identifier-free.
+          detectors: 'ssn,mrn,dob,csv_phi_header,phone,email'
           base-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
