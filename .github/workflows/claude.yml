@@ -79,6 +79,14 @@ on:
           project skills (symlinked to .claude/skills) so an "@claude <skill>"
           mention can invoke them by name. Off by default; turn on for repos
           (e.g. ai-config) that ship a skills/ dir meant for the bot.
+
+          CAVEAT: on PR-triggered runs, claude-code-action's
+          restoreConfigFromBase wipes .claude/ and restores it from the base
+          branch before Claude starts, which deletes this runtime symlink. So
+          for PR contexts this is a no-op — commit .claude/skills -> ../skills
+          to the default branch instead (the restore materializes a committed
+          symlink). This step still helps non-PR (issue) triggers, where no
+          base restore runs.
         type: boolean
         default: false
       eager-pr:
@@ -418,10 +426,18 @@ jobs:
 
       # Expose the caller repo's skills to Claude as *project* skills so an
       # "@claude <skill>" mention can invoke them by name. claude-code-action
-      # doesn't load ~/.claude skills (the runner's home is fresh), and a
-      # committed .claude/skills symlink is dropped during checkout — so
-      # (re)create it here, after the final branch is checked out and right
-      # before Claude runs. No-op unless the caller opts in and ships skills/.
+      # doesn't load ~/.claude skills (the runner's home is fresh), so create
+      # .claude/skills -> ../skills here, after the final branch checkout and
+      # right before Claude runs. No-op unless the caller opts in and ships
+      # skills/.
+      #
+      # CAVEAT (PR triggers): claude-code-action's restoreConfigFromBase wipes
+      # .claude/ and restores it from the base branch *after* this step, so on
+      # PRs this symlink is deleted before Claude starts — i.e. this is a no-op
+      # for PR contexts. To cover PRs, commit .claude/skills -> ../skills to the
+      # default branch: the base-restore then materializes the committed symlink
+      # (a `git checkout` of the base tree). This step still helps issue
+      # triggers, where no base restore runs.
       - name: Link repo skills into .claude/skills
         if: inputs.link-skills
         run: |
