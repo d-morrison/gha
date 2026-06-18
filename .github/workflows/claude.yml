@@ -36,6 +36,19 @@ on:
         description: Install Quarto (with tinytex) so Claude can render .qmd files.
         type: boolean
         default: false
+      apt-packages:
+        description: >-
+          Extra apt packages to install before R/Quarto setup (space- or
+          newline-separated). Use for system libraries a package needs to
+          compile or run (e.g. jags, libglpk-dev, poppler-utils). Empty to skip.
+        type: string
+        default: ''
+      pip-packages:
+        description: >-
+          Python packages to install with pip3 --break-system-packages
+          (space-separated) before Claude runs. Empty to skip.
+        type: string
+        default: ''
       use-renv:
         description: Restore dependencies with renv (setup-renv) instead of DESCRIPTION-based setup-r-dependencies.
         type: boolean
@@ -82,6 +95,15 @@ on:
         default: true
       prompt-addendum:
         description: Repo-specific instructions appended to Claude's prompt (e.g. the pre-commit checklist).
+        type: string
+        default: ''
+      webfetch-allowlist-url:
+        description: >-
+          URL of a newline-delimited hostname allowlist (e.g. the shared
+          d-morrison/stats-allowlist). When set, each valid hostname is turned
+          into a WebFetch(domain:<host>) grant and appended to claude-args, so
+          Claude may fetch pages from those sites. A fetch failure degrades
+          gracefully to no WebFetch grants. Empty to disable WebFetch.
         type: string
         default: ''
       claude-args:
@@ -195,6 +217,26 @@ jobs:
           git config --global url."https://x-access-token:${SUBMODULES_TOKEN}@github.com/".insteadOf "https://github.com/"
           git submodule update --init --recursive --depth 1
 
+      # System libraries some R/Quarto packages need to compile or run (e.g.
+      # jags, libglpk-dev, poppler-utils). Runs before R setup so renv/
+      # setup-r-dependencies can build against them.
+      - name: Install apt packages
+        if: inputs.apt-packages != ''
+        env:
+          APT_PACKAGES: ${{ inputs.apt-packages }}
+        run: |
+          sudo apt-get update
+          # Pipe through xargs rather than unquoted word-splitting so any shell
+          # metacharacters in the input are passed to apt-get as literal args
+          # (which it rejects) instead of being interpreted by the shell.
+          echo "$APT_PACKAGES" | xargs sudo apt-get install -y
+
+      - name: Install pip packages
+        if: inputs.pip-packages != ''
+        env:
+          PIP_PACKAGES: ${{ inputs.pip-packages }}
+        run: echo "$PIP_PACKAGES" | xargs pip3 install --break-system-packages
+
       - name: Set up pandoc
         if: inputs.setup-r
         uses: r-lib/actions/setup-pandoc@v2
@@ -215,6 +257,12 @@ jobs:
       - name: Restore renv
         if: inputs.setup-r && inputs.use-renv
         uses: r-lib/actions/setup-renv@v2
+        env:
+          # Without GITHUB_PAT, renv can't reach the GitHub API to resolve
+          # GitHub-sourced packages (e.g. ddsjoberg/gtsummary) and
+          # renv::restore() aborts with "GitHub authentication credentials are
+          # not available."
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
         with:
           cache-version: ${{ inputs.renv-cache-version }}
 
@@ -324,6 +372,37 @@ jobs:
             --body "Opened draft PR up front: ${PR_URL} — Claude is working on it now." \
             || echo "::warning::Could not post up-front PR link."
 
+      # Turn a shared hostname allowlist into WebFetch(domain:<host>) grants so
+      # Claude can read pages from approved sites. The hostname regex ensures a
+      # typo or tampered upstream entry can only widen WebFetch coverage, not
+      # inject other claude_args via quotes or shell metacharacters. A fetch
+      # failure degrades to no WebFetch grants rather than failing the run.
+      - name: Build WebFetch allowlist
+        id: webfetch
+        if: inputs.webfetch-allowlist-url != ''
+        env:
+          ALLOWLIST_URL: ${{ inputs.webfetch-allowlist-url }}
+        run: |
+          : > /tmp/allowlist.txt
+          curl -fsSL "$ALLOWLIST_URL" -o /tmp/allowlist.txt \
+            || echo "::warning::Could not fetch $ALLOWLIST_URL; running Claude without WebFetch permissions."
+          WEBFETCH=$(tr -d '\r' < /tmp/allowlist.txt \
+            | grep -v '^[[:space:]]*$' \
+            | grep -v '^[[:space:]]*#' \
+            | sed -E 's#^[[:space:]]*https?://##' \
+            | sed -E 's#/.*$##' \
+            | sed -E 's#[^A-Za-z0-9.-]+$##' \
+            | tr '[:upper:]' '[:lower:]' \
+            | grep -E '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$' \
+            | sort -u \
+            | sed 's#.*#WebFetch(domain:&)#' \
+            | paste -sd, -)
+          if [ -n "$WEBFETCH" ]; then
+            echo "args=--allowedTools \"$WEBFETCH\"" >> "$GITHUB_OUTPUT"
+          else
+            echo "args=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
@@ -334,7 +413,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: ${{ inputs.claude-args }}
+          # Let Claude read CI results (check runs / job logs) on PRs.
+          additional_permissions: |
+            actions: read
+          # Append the WebFetch grants (empty when webfetch-allowlist-url is
+          # unset). Multiple --allowedTools flags accumulate in the CLI.
+          claude_args: ${{ inputs.claude-args }} ${{ steps.webfetch.outputs.args }}
 
           # Setting `prompt:` puts the action in AGENT mode (see header). The
           # triggering comment/issue body is already supplied by the action's
@@ -393,6 +477,17 @@ jobs:
           BRANCH: ${{ steps.pr_checkout.outputs.branch }}
           STARTING_SHA: ${{ steps.pr_checkout.outputs.starting_sha }}
         run: |
+          # Sweep changes Claude staged or left untracked but never committed so
+          # they aren't dropped (uncommitted edits never advance HEAD, and the
+          # push below only fires when HEAD moved). Mirrors the issue-trigger
+          # finalize step. HEAD is the PR's checked-out head branch here.
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "claude[bot]"
+            git config user.email "claude[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore: auto-commit residual @claude session changes" \
+              || { echo "::error::auto-commit of residual @claude changes failed"; exit 1; }
+          fi
           CURRENT_SHA=$(git rev-parse HEAD)
           if [ "$CURRENT_SHA" = "$STARTING_SHA" ]; then
             echo "No new commits on the PR branch; nothing to push."
@@ -468,6 +563,14 @@ jobs:
             echo "::warning::No Claude execution output at $FILE; nothing to post."
             exit 0
           fi
+          # Distinguish an upstream schema change (the action renaming the
+          # assistant event type) from a genuinely empty session: surface the
+          # former distinctly instead of silently posting nothing.
+          ASSISTANT_COUNT=$(jq -rs 'flatten(1) | [.[] | select(type == "object" and .type == "assistant")] | length' < "$FILE")
+          if [ "$ASSISTANT_COUNT" = "0" ]; then
+            echo "::warning::No assistant-typed events in $FILE — the action's output schema may have changed (expected .type == \"assistant\"). Nothing to post."
+            exit 0
+          fi
           # execution_file is a single JSON array of event objects. flatten(1)
           # collapses the slurp wrap; the type=="object" guard skips non-objects.
           RESPONSE=$(jq -rs '
@@ -493,8 +596,23 @@ jobs:
           … (response truncated at ${MAX_LEN} bytes; full text in the [workflow run](${RUN_URL}))"
           fi
 
-          gh issue comment "$ENTITY_NUMBER" --repo "${{ github.repository }}" \
-            --body "$(printf '%s\n\n<sub>— posted by @claude post-step from [workflow run](%s)</sub>\n' "$RESPONSE" "$RUN_URL")" \
+          BODY="$(printf '%s\n\n<sub>— posted by @claude post-step from [workflow run](%s)</sub>\n' "$RESPONSE" "$RUN_URL")"
+          # When the trigger was an inline review comment, reply IN-THREAD to it
+          # (pulls/.../comments/<id>/replies) so the conversation stays anchored
+          # to the diff line; every other trigger gets a top-level comment (issue
+          # and PR-conversation comments share the same endpoint). The /replies
+          # endpoint needs the THREAD-ROOT id, so prefer `in_reply_to_id` (null
+          # at the thread root) and fall back to `comment.id`. Fall back to a
+          # top-level comment if the reply API fails (e.g. the parent was deleted).
+          REPLY_TARGET_ID="${{ github.event.comment.in_reply_to_id || github.event.comment.id }}"
+          if [ "${{ github.event_name }}" = "pull_request_review_comment" ]; then
+            if jq -n --arg b "$BODY" '{body: $b}' \
+                 | gh api --method POST "repos/${{ github.repository }}/pulls/$ENTITY_NUMBER/comments/$REPLY_TARGET_ID/replies" --input - >/dev/null; then
+              exit 0
+            fi
+            echo "::warning::In-thread reply failed; falling back to a top-level comment."
+          fi
+          gh issue comment "$ENTITY_NUMBER" --repo "${{ github.repository }}" --body "$BODY" \
             || echo "::warning::Could not post Claude's response back to the source thread."
 
       # Route an explicit `@claude review` request to the dedicated reviewer
@@ -575,6 +693,18 @@ jobs:
           MARK_READY: ${{ inputs.mark-ready-for-review }}
           CLAUDE_OUTCOME: ${{ steps.claude.outcome }}
         run: |
+          # Sweep changes Claude staged or left untracked but never committed so
+          # the no-new-commits check below doesn't discard them. The agent works
+          # on the checked-out $BRANCH, so committing on HEAD lands on $BRANCH in
+          # the normal case (a stray detach is the pre-existing edge the $BRANCH
+          # measurement below already tolerates).
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "claude[bot]"
+            git config user.email "claude[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "chore: auto-commit residual @claude session changes" \
+              || { echo "::error::auto-commit of residual @claude changes failed"; exit 1; }
+          fi
           # Measure the tip of $BRANCH (not HEAD): the agent has git checkout/
           # switch in its toolset, so a stray detach would make HEAD diverge
           # from the branch we actually push.

@@ -45,8 +45,8 @@ Pin to `@v1` (a moving major tag updated as fixes land). Do not reference
 | `check-links.yml` | lychee link check with bundled config, PR skip-label, and auto-issue on `main` | `lychee-config`, `lychee-args`, `create-issue-on-main`, `skip-label` |
 | `summary.yml` | AI summary comment on newly opened issues | — |
 | `check-news.yml` | Enforce a `NEWS.md` changelog entry on PRs (wraps `UCD-SERG/changelog-check-action`) | `changelog` |
-| `claude.yml` | Agent-mode Claude Code bot: responds to `@claude` mentions, edits files, opens/updates PRs | `setup-r`, `install-quarto`, `use-renv`, `eager-pr`, `prompt-addendum`, `reviewer` |
-| `claude-code-review.yml` | Read-only Claude PR review (runs the `code-review` plugin; inline findings on `pull_request` runs, consolidated summary on dispatched runs) | `pr-number`, `prompt-addendum` |
+| `claude.yml` | Agent-mode Claude Code bot: responds to `@claude` mentions, edits files, opens/updates PRs | `setup-r`, `install-quarto`, `use-renv`, `apt-packages`, `pip-packages`, `eager-pr`, `prompt-addendum`, `webfetch-allowlist-url`, `reviewer` |
+| `claude-code-review.yml` | Read-only Claude PR review (runs the `code-review` plugin; inline findings on `pull_request` runs, consolidated summary on dispatched runs) | `pr-number`, `prompt-addendum`, `checkout-submodules` |
 
 ## Permissions
 
@@ -73,6 +73,9 @@ that need to write must have the **caller** grant it on the calling job:
 - `claude-code-review` (read-only review) → grant `contents: read`,
   `pull-requests: write`, `issues: write`, `id-token: write`, and the
   `CLAUDE_CODE_OAUTH_TOKEN` secret.
+  - **Optional:** set `checkout-submodules: true` (and add a `SUBMODULES_TOKEN`
+    secret) so the reviewer can read submodule contents instead of reporting
+    them as uninitialized.
 
 The stubs in [`examples/`](examples) already include the right `permissions:`
 blocks — copy them as-is.
