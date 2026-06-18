@@ -39,6 +39,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           SKIP_LABEL: ${{ inputs.skip-label }}
         run: |
+          set -euo pipefail
           LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
           if printf '%s\n' "$LABELS" | grep -Fxq "$SKIP_LABEL"; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
@@ -61,6 +62,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          set -euo pipefail
           BODY=$(cat <<EOF
           The link checker found broken links in the main branch.
 

@@ -36,6 +36,7 @@ runs:
       id: find-bibs
       shell: bash
       run: |
+        set -euo pipefail
         BIB_FILES=$(find . -name "*.bib" -not -path "./.git/*" | tr '\n' ' ')
         echo "Found bibliography files: $BIB_FILES"
         echo "bib_files=$BIB_FILES" >> "$GITHUB_OUTPUT"
@@ -48,6 +49,7 @@ runs:
         BIB_EXCLUDE_KEYS: ${{ inputs.exclude-keys }}
         NO_METADATA_CHECK: ${{ inputs.no-metadata-check }}
       run: |
+        set -euo pipefail
         ARGS=""
         if [ "$NO_METADATA_CHECK" = "true" ]; then ARGS="--no-metadata-check"; fi
         Rscript "$GITHUB_ACTION_PATH/check-bibliography-dois.R" $ARGS $BIB_FILES

@@ -26,6 +26,7 @@ runs:
         USER_CONFIG: ${{ inputs.lychee-config }}
         USER_ARGS: ${{ inputs.lychee-args }}
       run: |
+        set -euo pipefail
         if [ -n "$USER_CONFIG" ] && [ -f "$USER_CONFIG" ]; then
           echo "config=$USER_CONFIG" >> "$GITHUB_OUTPUT"
           echo "Using caller-provided lychee config: $USER_CONFIG"
