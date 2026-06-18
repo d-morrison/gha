@@ -73,6 +73,14 @@ on:
           secret; public submodules clone anonymously without it.
         type: boolean
         default: false
+      link-skills:
+        description: >-
+          Expose the caller repo's top-level skills/ directory to Claude as
+          project skills (symlinked to .claude/skills) so an "@claude <skill>"
+          mention can invoke them by name. Off by default; turn on for repos
+          (e.g. ai-config) that ship a skills/ dir meant for the bot.
+        type: boolean
+        default: false
       eager-pr:
         description: >-
           On an issue trigger, open the draft PR up front (before Claude works,
@@ -406,6 +414,24 @@ jobs:
             echo "args=--allowedTools \"$WEBFETCH\"" >> "$GITHUB_OUTPUT"
           else
             echo "args=" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Expose the caller repo's skills to Claude as *project* skills so an
+      # "@claude <skill>" mention can invoke them by name. claude-code-action
+      # doesn't load ~/.claude skills (the runner's home is fresh), and a
+      # committed .claude/skills symlink is dropped during checkout — so
+      # (re)create it here, after the final branch is checked out and right
+      # before Claude runs. No-op unless the caller opts in and ships skills/.
+      - name: Link repo skills into .claude/skills
+        if: inputs.link-skills
+        run: |
+          if [ -d skills ]; then
+            mkdir -p .claude
+            rm -rf .claude/skills
+            ln -s ../skills .claude/skills
+            echo "Linked .claude/skills -> ../skills ($(ls -1 skills | wc -l | tr -d ' ') skills)."
+          else
+            echo "::warning::link-skills is true but no top-level skills/ directory was found."
           fi
 
       - name: Run Claude Code
