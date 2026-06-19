@@ -13,6 +13,22 @@ below with migration steps.
 
 ### Added
 
+- PR-preview / publish family (#33) — centralizes the three-workflow preview
+  pipeline rme carried inline:
+  - `preview` composite action + `preview.yml` reusable workflow — build half;
+    renders the Quarto site read-only in the (possibly fork) PR context and
+    uploads it + PR metadata as an artifact. Parameterized for non-rme
+    consumers (R version, apt packages, renv on/off, local-package install,
+    Chrome, submodules, render profile). Writes PR metadata **after** checkout
+    so `git clean -ffdx` can't wipe it from the artifact (d-morrison/rme#913),
+    and keeps the `preview:pdf`/`preview:docx`/`preview:revealjs` and
+    `clear freezer` label gates.
+  - `preview-deploy.yml` reusable workflow — deploy half; on `workflow_run`
+    completion publishes the artifact to `gh-pages` in the base-repo context
+    and comments the preview link. Kept split from the build half so untrusted
+    fork code never holds write permissions (the trust boundary).
+  - `cleanup-pr-previews.yml` reusable workflow — scheduled housekeeping that
+    deletes preview directories for closed PRs.
 - `check-phi` — scans pull requests (added lines only; whole tree on `push`)
   for content that looks like PHI: US Social Security numbers, medical record
   numbers, dates of birth, and PHI-suggestive column headers in delimited data

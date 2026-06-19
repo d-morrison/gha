@@ -1,0 +1,188 @@
+name: Build Quarto PR preview
+description: >-
+  Build a Quarto site for a pull-request preview and stage it (plus the PR
+  metadata the deploy half needs) into a single artifact. Runs read-only in the
+  (possibly fork) PR context — all writes to the base repo happen later in the
+  deploy half (see the preview-deploy reusable workflow), which runs in the
+  base-repo context via workflow_run. The R-package / Quarto specifics are
+  parameterized so non-rme consumers can reuse this.
+inputs:
+  r-version:
+    description: R version to install with r-lib/actions/setup-r.
+    default: '4.6.0'
+  apt-packages:
+    description: >-
+      System (apt) packages to install before R/Quarto setup, space-separated.
+      Defaults to the shared renv stack plus the preview build helpers. Set to
+      an empty string to skip the apt step entirely.
+    default: >-
+      jags libcurl4-openssl-dev libpng-dev libfontconfig1-dev libjpeg-dev
+      libglpk-dev libharfbuzz-dev libfribidi-dev libfreetype6-dev libtiff5-dev
+      libwebp-dev libnode109 cmake libgit2-dev libnode-dev libx11-dev pandoc
+  use-renv:
+    description: Restore R dependencies with renv (r-lib/actions/setup-renv). Set 'false' for non-renv repos.
+    default: 'true'
+  install-package:
+    description: Run `R CMD INSTALL .` to install the caller repo as a local package before rendering.
+    default: 'true'
+  setup-chrome:
+    description: Install Chrome (needed by Quarto for revealjs / screenshot rendering).
+    default: 'true'
+  submodules:
+    description: Passed to actions/checkout `submodules` (e.g. 'recursive', 'true', or 'false').
+    default: 'recursive'
+  render-profile:
+    description: Quarto `--profile` to render with.
+    default: 'website'
+runs:
+  using: composite
+  steps:
+    - name: Check out repository
+      if: github.event.action != 'closed'
+      uses: actions/checkout@v5
+      with:
+        submodules: ${{ inputs.submodules }}
+
+    # IMPORTANT: write the metadata AFTER checkout. actions/checkout runs
+    # `git clean -ffdx` (clean: true is the default), which deletes any
+    # untracked files already in the workspace — including a
+    # `_preview_upload/` directory created beforehand. With the metadata
+    # written before checkout, `_preview_upload/meta/` was wiped and never
+    # reached the artifact, so the deploy half read an empty pr-number, the
+    # deploy step's `action == 'deploy'` guard was false, and every deploy-path
+    # preview was silently skipped (the job still passed). See d-morrison/rme#913.
+    # For the 'closed'/remove event the checkout step is skipped, but this step
+    # is unguarded and still runs, so the remove path is unaffected.
+    - name: Save PR metadata
+      shell: bash
+      env:
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        PREVIEW_ACTION: ${{ github.event.action == 'closed' && 'remove' || 'deploy' }}
+      run: |
+        set -euo pipefail
+        mkdir -p _preview_upload/meta
+        echo "$PR_NUMBER" > _preview_upload/meta/pr-number.txt
+        echo "$PREVIEW_ACTION" > _preview_upload/meta/action.txt
+
+    - name: Set up Quarto
+      if: github.event.action != 'closed'
+      uses: quarto-dev/quarto-actions/setup@v2
+      env:
+        GH_TOKEN: ${{ github.token }}
+      with:
+        tinytex: false
+
+    - name: Set up R
+      if: github.event.action != 'closed'
+      uses: r-lib/actions/setup-r@v2
+      with:
+        r-version: ${{ inputs.r-version }}
+        use-public-rspm: true
+
+    - name: Install system dependencies
+      if: github.event.action != 'closed' && inputs.apt-packages != ''
+      shell: bash
+      env:
+        APT_PACKAGES: ${{ inputs.apt-packages }}
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        # Intentional word-splitting: APT_PACKAGES is a space-separated list.
+        sudo apt-get install -y $APT_PACKAGES
+
+    - name: Setup Chrome
+      if: github.event.action != 'closed' && inputs.setup-chrome == 'true'
+      uses: browser-actions/setup-chrome@v1
+
+    - name: Restore R dependencies (renv)
+      if: github.event.action != 'closed' && inputs.use-renv == 'true'
+      uses: r-lib/actions/setup-renv@v2
+      env:
+        GITHUB_PAT: ${{ github.token }}
+      with:
+        bypass-cache: never
+
+    - name: Install local package
+      if: github.event.action != 'closed' && inputs.install-package == 'true'
+      shell: bash
+      run: R CMD INSTALL .
+
+    - name: Set up TinyTeX
+      if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:pdf')
+      uses: quarto-dev/quarto-actions/setup@v2
+      env:
+        GH_TOKEN: ${{ github.token }}
+      with:
+        tinytex: true
+
+    - name: Install TinyTeX packages required for PDF rendering
+      if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:pdf')
+      shell: bash
+      run: |
+        set -euo pipefail
+        Rscript -e "tinytex::tlmgr_repo('https://mirror.ctan.org/systems/texlive/tlnet')"
+        Rscript -e "tinytex::tlmgr_install(c('luacolor', 'lua-ul'))"
+
+    - name: Restore Quarto freeze
+      if: github.event.action != 'closed' && !contains(github.event.pull_request.labels.*.name, 'clear freezer')
+      uses: actions/cache/restore@v4
+      with:
+        path: _freeze
+        key: quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
+        restore-keys: |
+          quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-
+          quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-main-
+          quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-
+          quarto-freezer-${{ runner.os }}-
+
+    - name: Render pdf
+      if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:pdf')
+      shell: bash
+      run: quarto render --profile ${{ inputs.render-profile }} --to pdf
+
+    - name: Render docx
+      if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:docx')
+      shell: bash
+      run: quarto render --profile ${{ inputs.render-profile }} --to docx --no-clean
+
+    - name: Render revealjs
+      if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:revealjs')
+      shell: bash
+      run: quarto render --profile ${{ inputs.render-profile }} --to revealjs --no-clean
+
+    - name: Render html
+      if: github.event.action != 'closed'
+      shell: bash
+      run: quarto render --profile ${{ inputs.render-profile }} --to html --no-clean
+
+    - name: List files
+      if: github.event.action != 'closed'
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "contents of _site:"
+        ls _site/
+        echo "contents of .:"
+        ls .
+
+    - name: Save Quarto freeze
+      if: github.event.action != 'closed'
+      uses: actions/cache/save@v4
+      with:
+        path: _freeze
+        key: quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
+
+    - name: Stage site for upload
+      if: github.event.action != 'closed'
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p _preview_upload/site/
+        cp -r _site/. _preview_upload/site/
+
+    - name: Upload preview artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: pr-preview-site
+        path: _preview_upload/
+        retention-days: 1
