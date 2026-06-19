@@ -41,22 +41,25 @@ jobs:
               pr_number=$(basename "$dir" | sed 's/pr-//')
               echo "Checking PR #${pr_number}..."
 
-              gh_output=$(gh pr view "$pr_number" \
+              if pr_state=$(gh pr view "$pr_number" \
                 --repo "$GITHUB_REPOSITORY" \
                 --json state \
-                --jq '.state' 2>&1) && gh_exit=0 || gh_exit=$?
-
-              if [ "$gh_exit" -ne 0 ]; then
-                # Distinguish "PR does not exist" from other failures
-                if echo "$gh_output" | grep -qi "could not resolve\|no pull requests found\|404\|not found"; then
+                --jq '.state' 2>/dev/null); then
+                : # got the PR state
+              else
+                # The query failed. Distinguish "PR does not exist" (safe to
+                # delete the preview) from a transient error (skip, to avoid
+                # deleting a live preview). Key on the REST API's HTTP status
+                # rather than gh's human-readable error text, which can change
+                # across CLI versions.
+                http_status=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" -i 2>/dev/null \
+                  | head -n1 | awk '{print $2}') || true
+                if [ "$http_status" = "404" ]; then
                   pr_state="NOT_FOUND"
                 else
-                  echo "Warning: could not query PR #${pr_number} (exit ${gh_exit}): ${gh_output}" >&2
-                  echo "Skipping PR #${pr_number} to avoid accidental deletion."
+                  echo "Warning: could not query PR #${pr_number} (HTTP ${http_status:-unknown}); skipping to avoid accidental deletion." >&2
                   continue
                 fi
-              else
-                pr_state="$gh_output"
               fi
 
               if [ "$pr_state" != "OPEN" ]; then

@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           count=$(gh api \
-            "repos/${{ github.repository }}/actions/runs/${RUN_ID}/artifacts" \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
             --jq '[.artifacts[] | select(.name == "pr-preview-site")] | length')
           echo "found=$([ "$count" -gt 0 ] && echo 'true' || echo 'false')" >> "$GITHUB_OUTPUT"
 

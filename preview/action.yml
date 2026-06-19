@@ -70,7 +70,10 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
       with:
-        tinytex: false
+        # Install TinyTeX in the same setup only when a PDF render is requested;
+        # composite actions can't vary `with:` conditionally, so gate it on the
+        # label expression rather than running a second setup step.
+        tinytex: ${{ contains(github.event.pull_request.labels.*.name, 'preview:pdf') }}
 
     - name: Set up R
       if: github.event.action != 'closed'
@@ -107,14 +110,6 @@ runs:
       shell: bash
       run: R CMD INSTALL .
 
-    - name: Set up TinyTeX
-      if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:pdf')
-      uses: quarto-dev/quarto-actions/setup@v2
-      env:
-        GH_TOKEN: ${{ github.token }}
-      with:
-        tinytex: true
-
     - name: Install TinyTeX packages required for PDF rendering
       if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:pdf')
       shell: bash
@@ -138,22 +133,30 @@ runs:
     - name: Render pdf
       if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:pdf')
       shell: bash
-      run: quarto render --profile ${{ inputs.render-profile }} --to pdf
+      env:
+        RENDER_PROFILE: ${{ inputs.render-profile }}
+      run: quarto render --profile "$RENDER_PROFILE" --to pdf
 
     - name: Render docx
       if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:docx')
       shell: bash
-      run: quarto render --profile ${{ inputs.render-profile }} --to docx --no-clean
+      env:
+        RENDER_PROFILE: ${{ inputs.render-profile }}
+      run: quarto render --profile "$RENDER_PROFILE" --to docx --no-clean
 
     - name: Render revealjs
       if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:revealjs')
       shell: bash
-      run: quarto render --profile ${{ inputs.render-profile }} --to revealjs --no-clean
+      env:
+        RENDER_PROFILE: ${{ inputs.render-profile }}
+      run: quarto render --profile "$RENDER_PROFILE" --to revealjs --no-clean
 
     - name: Render html
       if: github.event.action != 'closed'
       shell: bash
-      run: quarto render --profile ${{ inputs.render-profile }} --to html --no-clean
+      env:
+        RENDER_PROFILE: ${{ inputs.render-profile }}
+      run: quarto render --profile "$RENDER_PROFILE" --to html --no-clean
 
     - name: List files
       if: github.event.action != 'closed'

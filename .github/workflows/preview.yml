@@ -69,6 +69,9 @@ jobs:
     steps:
       - name: Build preview
         uses: d-morrison/gha/preview@v1
+        # The `type: boolean` inputs above are coerced to the strings
+        # 'true'/'false' when passed to the composite action, which compares
+        # them as strings (e.g. `inputs.use-renv == 'true'`).
         with:
           r-version: ${{ inputs.r-version }}
           apt-packages: ${{ inputs.apt-packages }}
