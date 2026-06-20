@@ -168,6 +168,26 @@ Releases are tagged `vX.Y.Z`; the `vX` major tag moves to the latest compatible
 release. Consumers reference `@v1`. See [`CHANGELOG.md`](CHANGELOG.md) for what
 changes as the `@v1` tag moves and for any breaking-change migration steps.
 
+### Pinning third-party actions
+
+Every **third-party** action is pinned to a full commit SHA, with the
+human-readable version in a trailing comment, e.g.:
+
+```yaml
+uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+```
+
+This is GitHub's [recommended hardening posture](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions):
+a SHA is immutable, so a re-pointed tag or a compromised upstream can't silently
+change what runs — which matters here because jobs like the preview deploy run
+with `contents: write` + `pull-requests: write`. [`.github/dependabot.yml`](.github/dependabot.yml)
+bumps these pins as upstreams publish releases, so they stay current instead of
+freezing. When adding a new third-party action, pin it the same way.
+
+First-party `d-morrison/gha/*@v1` self-references and the [`examples/`](examples/)
+templates intentionally track the `@v1` major tag (so consumers ride the moving
+major), and so are **not** SHA-pinned.
+
 ## Reverse dependencies
 
 [`REVDEPS.md`](REVDEPS.md) tracks repos that call these workflows, so consumers
