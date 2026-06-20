@@ -524,8 +524,17 @@ jobs:
           # working-tree change; the auto-commit below would commit it and
           # silently revert the PR's own config edits (#39). Restore those paths
           # to the PR branch tip (HEAD) first so the sweep only commits Claude's
-          # intentional changes. The list mirrors the action's SENSITIVE_PATHS
-          # (root-only, path-literal); `|| true` tolerates paths absent here.
+          # intentional changes.
+          #
+          # The list mirrors the action's SENSITIVE_PATHS (root-only, path-
+          # literal) from src/github/operations/restore-config.ts on the @v1
+          # line (read 2026-06). This copy can't detect upstream drift, so
+          # re-check it against that file when bumping claude-code-action.
+          # `2>/dev/null || true` tolerates a path absent from HEAD here. The
+          # sweep is intentionally lossy in one case: *uncommitted* Claude edits
+          # to a config file are discarded (HEAD wins) — same net effect as
+          # excluding the path from `git add -A`. The prompt tells Claude to
+          # commit its edits, so only residual scratch work is lost.
           for cfg in .claude .mcp.json .claude.json .gitmodules .ripgreprc CLAUDE.md CLAUDE.local.md .husky; do
             git checkout HEAD -- "$cfg" 2>/dev/null || true
           done
