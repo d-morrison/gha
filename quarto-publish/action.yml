@@ -81,6 +81,8 @@ runs:
         OUTPUT_DIR: ${{ inputs.output-dir }}
       run: |
         set -euo pipefail
+        # --output-dir is resolved relative to the project dir, so the site
+        # lands at "$PROJECT_PATH/$OUTPUT_DIR" (matching the verify/upload paths).
         quarto render "$PROJECT_PATH" --output-dir "$OUTPUT_DIR"
 
     - name: Verify rendered output exists
