@@ -36,6 +36,10 @@ on:
         description: Extra apt packages to install before rendering (space-separated).
         type: string
         default: ''
+      output-dir:
+        description: The project's rendered output directory (override only if _quarto.yml sets a non-default output-dir).
+        type: string
+        default: '_site'
       checkout-submodules:
         description: Initialize the caller's git submodules before rendering.
         type: boolean
@@ -48,7 +52,10 @@ on:
         type: string
         default: ''
       pre-render-artifact-path:
-        description: Directory (in the caller repo) to extract pre-render-artifact into.
+        description: >-
+          Directory (in the caller repo) to extract pre-render-artifact into.
+          Defaults to the workspace root when omitted; set it when the artifact
+          should land in a subdirectory the site references.
         type: string
         default: ''
       deploy:
@@ -61,15 +68,14 @@ on:
         required: false
 
 jobs:
-  publish:
+  # Build only: render and stage the Pages artifact. Held to contents:read with
+  # no environment, so a build-only caller (deploy: false, e.g. a PR preview) is
+  # never blocked by `github-pages` environment protection rules or granted
+  # Pages/id-token permissions it doesn't use.
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -99,8 +105,22 @@ jobs:
           use-renv: ${{ inputs.use-renv }}
           tinytex: ${{ inputs.tinytex }}
           apt-packages: ${{ inputs.apt-packages }}
+          output-dir: ${{ inputs.output-dir }}
 
+  # Deploy the staged artifact to Pages. Only this job needs the elevated
+  # permissions and the github-pages environment, and it's skipped entirely
+  # when deploy is false.
+  deploy:
+    needs: build
+    if: inputs.deploy
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deploy
-        if: inputs.deploy
         uses: actions/deploy-pages@v4

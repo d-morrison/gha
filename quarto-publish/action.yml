@@ -33,6 +33,11 @@ inputs:
   apt-packages:
     description: Extra apt packages to install before rendering (space-separated).
     default: ''
+  output-dir:
+    description: >-
+      The project's rendered output directory (Quarto's `output-dir`, relative
+      to `path`). Override only if `_quarto.yml` sets a non-default output-dir.
+    default: '_site'
 runs:
   using: composite
   steps:
@@ -72,7 +77,18 @@ runs:
       with:
         path: ${{ inputs.path }}
 
+    - name: Verify rendered output exists
+      shell: bash
+      env:
+        SITE_DIR: ${{ inputs.path }}/${{ inputs.output-dir }}
+      run: |
+        set -euo pipefail
+        if [ ! -d "$SITE_DIR" ]; then
+          echo "::error::Rendered output not found at '$SITE_DIR'. If _quarto.yml sets a non-default output-dir, pass it via the 'output-dir' input."
+          exit 1
+        fi
+
     - name: Upload Pages artifact
       uses: actions/upload-pages-artifact@v3
       with:
-        path: ${{ inputs.path }}/_site
+        path: ${{ inputs.path }}/${{ inputs.output-dir }}
