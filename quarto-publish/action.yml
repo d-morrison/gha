@@ -38,7 +38,7 @@ inputs:
       Directory the rendered site is written to and staged from, relative to
       `path`. Forwarded to `quarto render --output-dir`, so this input is
       authoritative — it overrides any `output-dir` set in the project's
-      `_quarto.yml`. Defaults to Quarto's own default, `_site`.
+      `_quarto.yml`. Defaults to `_site`.
     default: '_site'
 runs:
   using: composite
