@@ -18,13 +18,17 @@ composite action plus a `workflow_call` reusable workflow. Consumers pin to `@v1
   is the shared push-and-open-PR helper used by `bump-submodule` and
   `sync-shared-fragments`).
 - `.github/workflows/` — the `workflow_call` reusable workflows that wrap the
-  composites (one per capability, plus `claude*` variants), and `_selftest.yml`,
-  which exercises composites on every PR — local `./` refs for pre-release
+  composites (one per capability), plus the `claude.yml` and
+  `claude-code-review.yml` reusable wrappers, and `_selftest.yml`, which
+  exercises composites on every PR — local `./` refs for pre-release
   capabilities, and `@v1` through the reusable-workflow wrappers for stable ones.
-  Some workflows here are
-  standalone and wrap no root composite — e.g. `check-news.yml`, `summary.yml`,
-  `cleanup-pr-previews.yml`, `slide-major-tag.yml`, `preview-deploy.yml`,
-  `bump-submodule.yml`, and `sync-shared-fragments.yml`.
+  `claude-bot.yml` and `claude-review.yml` are event-triggered workflows that run
+  the Claude bot in this repo, not `workflow_call` wrappers.
+- Several workflows have no corresponding root composite: `check-news.yml`,
+  `summary.yml`, `cleanup-pr-previews.yml`, `preview-deploy.yml`,
+  `bump-submodule.yml`, and `sync-shared-fragments.yml` are `workflow_call`
+  reusable workflows that wrap external actions; `slide-major-tag.yml` is
+  push-triggered and runs only in this repo.
 - `.github/actions/checkout-submodules/` — a small shared composite reused by the
   reusable workflows.
 - `examples/` — caller stubs consumers copy into their own repos.
