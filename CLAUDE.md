@@ -10,22 +10,27 @@ composite action plus a `workflow_call` reusable workflow. Consumers pin to `@v1
 
 ### Layout
 
-- Per-capability composite-action directories at the repo root, each holding an
-  `action.yml` plus its helper script — e.g. `check-bibliography-dois/` (R),
-  `check-non-standard-chars/` and `check-phi/` (Python), `check-links/` (bundled
-  `lychee.default.toml`), and `preview/`, `quarto-publish/`, `open-sync-pr/`
-  (the last is the shared push-and-open-PR helper used by `bump-submodule` and
+- Per-capability composite-action directories at the repo root, each with an
+  `action.yml` and, for R/Python capabilities, a language-specific helper
+  script — e.g. `check-bibliography-dois/` (R), `check-non-standard-chars/` and
+  `check-phi/` (Python). `check-links/` bundles `lychee.default.toml`;
+  `preview/`, `quarto-publish/`, and `open-sync-pr/` are action-only (the last
+  is the shared push-and-open-PR helper used by `bump-submodule` and
   `sync-shared-fragments`).
 - `.github/workflows/` — the `workflow_call` reusable workflows that wrap the
   composites (one per capability, plus `claude*` variants), and `_selftest.yml`,
-  which exercises the local composites on every PR.
+  which exercises the local composites on every PR. Some workflows here are
+  standalone and wrap no root composite — e.g. `check-news.yml`, `summary.yml`,
+  `cleanup-pr-previews.yml`, `slide-major-tag.yml`, `preview-deploy.yml`,
+  `bump-submodule.yml`, and `sync-shared-fragments.yml`.
 - `.github/actions/checkout-submodules/` — a small shared composite reused by the
   reusable workflows.
 - `examples/` — caller stubs consumers copy into their own repos.
 - `README.md`, `CHANGELOG.md`, `REVDEPS.md` (registered downstream consumers).
 
-When editing a capability, change the composite (`<name>/action.yml` + script)
-and keep the wrapping reusable workflow and its `examples/<name>.yml` stub in
+When editing a capability, change the composite (`<name>/action.yml`, plus its
+helper script if one exists) and keep the wrapping reusable workflow and its
+`examples/<name>.yml` stub in
 sync. New `.github/workflows/` changes are exercised by `_selftest.yml`; because
 brand-new actions aren't at the `@v1` tag yet, the selftest runs them via the
 local `./<name>` ref until release.
