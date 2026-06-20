@@ -67,7 +67,7 @@ below with migration steps.
   hallucinations — fabricated functions/arguments/APIs, invented references,
   DOIs, or URLs, plausible-but-unreal file paths and constants, and comments
   that describe behavior the code doesn't implement — and to verify questionable
-  symbols against the codebase rather than assuming they exist.
+  symbols against the codebase rather than assuming they exist (#56).
 
 ### Fixed
 
