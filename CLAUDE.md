@@ -25,10 +25,11 @@ composite action plus a `workflow_call` reusable workflow. Consumers pin to `@v1
   `claude-bot.yml` and `claude-review.yml` are event-triggered workflows that run
   the Claude bot in this repo, not `workflow_call` wrappers.
 - Several workflows have no corresponding root composite: `check-news.yml`,
-  `summary.yml`, `cleanup-pr-previews.yml`, `preview-deploy.yml`,
-  `bump-submodule.yml`, and `sync-shared-fragments.yml` are `workflow_call`
-  reusable workflows that wrap external actions; `slide-major-tag.yml` is
-  push-triggered and runs only in this repo.
+  `summary.yml`, `cleanup-pr-previews.yml`, and `preview-deploy.yml` are
+  `workflow_call` reusable workflows that wrap external actions;
+  `bump-submodule.yml` and `sync-shared-fragments.yml` are `workflow_call`
+  reusable workflows that call the shared internal `open-sync-pr` composite;
+  `slide-major-tag.yml` is push-triggered and runs only in this repo.
 - `.github/actions/checkout-submodules/` — a small shared composite reused by the
   reusable workflows.
 - `examples/` — caller stubs consumers copy into their own repos.
