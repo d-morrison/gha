@@ -1,0 +1,88 @@
+name: Open a sync PR if files changed
+description: >-
+  Shared helper for the content-sync workflows. If the working tree has staged
+  or unstaged changes, commit them on a fixed automation branch and open a pull
+  request -- or update the existing one when that branch already has an open PR.
+  A no-op when nothing changed. The caller stages the change (a submodule bump, a
+  vendored-file refresh, etc.) before invoking this action.
+inputs:
+  branch:
+    description: >-
+      Head branch for the automation PR. Reused across runs and reset each time,
+      so a stale PR is updated in place rather than duplicated.
+    required: true
+  base:
+    description: Base branch to open the PR against.
+    default: main
+  commit-message:
+    description: Commit message for the change (also the default PR title).
+    required: true
+  pr-title:
+    description: Pull request title. Defaults to the commit message.
+    default: ''
+  pr-body:
+    description: Pull request body.
+    default: ''
+  token:
+    description: >-
+      Token used to push the branch and open the PR. Pass
+      WORKFLOW_TOKEN || GITHUB_TOKEN; the integrated GITHUB_TOKEN works only when
+      "Allow GitHub Actions to create and approve pull requests" is enabled.
+    required: true
+outputs:
+  changed:
+    description: 'true when a change was committed and a PR opened/updated; false otherwise.'
+    value: ${{ steps.commit.outputs.changed }}
+  pr-url:
+    description: URL of the opened or updated pull request (empty when unchanged).
+    value: ${{ steps.pr.outputs.pr-url }}
+runs:
+  using: composite
+  steps:
+    - name: Commit staged changes to the automation branch
+      id: commit
+      shell: bash
+      env:
+        BRANCH: ${{ inputs.branch }}
+        COMMIT_MESSAGE: ${{ inputs.commit-message }}
+      run: |
+        set -euo pipefail
+        if [ -z "$(git status --porcelain)" ]; then
+          echo "::notice::No changes to sync; nothing to do."
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        # Re-create the automation branch at the current commit each run, so the
+        # PR always carries exactly one commit holding the latest sync.
+        git switch -C "$BRANCH"
+        git add -A
+        git commit -m "$COMMIT_MESSAGE"
+        echo "changed=true" >> "$GITHUB_OUTPUT"
+
+    - name: Push and open or update the PR
+      id: pr
+      if: steps.commit.outputs.changed == 'true'
+      shell: bash
+      env:
+        BRANCH: ${{ inputs.branch }}
+        BASE: ${{ inputs.base }}
+        PR_TITLE: ${{ inputs.pr-title != '' && inputs.pr-title || inputs.commit-message }}
+        PR_BODY: ${{ inputs.pr-body }}
+        GH_TOKEN: ${{ inputs.token }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        # Force-push: the branch is bot-owned and reset on every run.
+        git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
+        existing=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json url --jq '.[0].url // ""')
+        if [ -n "$existing" ]; then
+          echo "::notice::Updated existing PR: ${existing}"
+          echo "pr-url=${existing}" >> "$GITHUB_OUTPUT"
+        else
+          url=$(gh pr create --repo "$REPO" --base "$BASE" --head "$BRANCH" \
+            --title "$PR_TITLE" --body "$PR_BODY")
+          echo "::notice::Opened PR: ${url}"
+          echo "pr-url=${url}" >> "$GITHUB_OUTPUT"
+        fi

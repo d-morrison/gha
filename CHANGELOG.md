@@ -13,6 +13,18 @@ below with migration steps.
 
 ### Added
 
+- Shared-content sync family (#57) — keeps guidance shared between repos current
+  in both directions, via two reusable workflows and a shared helper:
+  - `bump-submodule.yml` — update a named submodule to its upstream HEAD and open
+    a PR when the pointer moves (one direction; e.g. the lab manual tracking
+    `.ai-config`).
+  - `sync-shared-fragments.yml` — vendor a set of files from an upstream repo,
+    pinned to a commit and recorded in a JSON manifest, and open a PR when they
+    change (the other direction; avoids a recursive mutual submodule).
+  - `open-sync-pr` composite — the commit-and-open-PR helper both workflows
+    reuse: commits staged changes to a reused automation branch and opens or
+    updates the PR, no-op when nothing changed. First consumers:
+    `UCD-SERG/lab-manual` and `d-morrison/ai-config`.
 - `quarto-publish` — render a Quarto site and deploy it to GitHub Pages. A
   composite (`quarto-publish/action.yml`) sets up Quarto (optionally R/renv and
   TinyTeX), renders a project at a given `path`, and stages the rendered output
