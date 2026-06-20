@@ -1,15 +1,15 @@
 name: Build a Quarto site for GitHub Pages
 description: >-
   Set up Quarto (optionally R/renv and TinyTeX), render a Quarto project, and
-  stage its _site output as a GitHub Pages artifact. The reusable
+  stage its rendered output as a GitHub Pages artifact. The reusable
   quarto-publish.yml workflow wraps this and adds the Pages deploy; callers that
   only want to build (e.g. a preview job) can use this composite directly.
 inputs:
   path:
     description: >-
-      Path (relative to the caller repo root) to the Quarto project to render —
-      the directory containing _quarto.yml. Its rendered output is expected at
-      <path>/_site.
+      Path (relative to the caller repo root) to the Quarto project to render:
+      the directory containing _quarto.yml. Its rendered output (at the
+      output-dir below) is staged for Pages.
     default: '.'
   setup-r:
     description: >-
