@@ -126,7 +126,7 @@ runs:
         key: quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
         restore-keys: |
           quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-
-          quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-main-
+          quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.base.ref }}-
           quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-
           quarto-freezer-${{ runner.os }}-
 
