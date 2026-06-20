@@ -13,6 +13,7 @@ from pathlib import Path
 
 _MOD_PATH = Path(__file__).resolve().parent.parent / "check-phi.py"
 _spec = importlib.util.spec_from_file_location("check_phi", _MOD_PATH)
+assert _spec is not None and _spec.loader is not None, f"Could not load {_MOD_PATH}"
 check_phi = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check_phi)
 
@@ -28,7 +29,15 @@ def test_ssn_matches_a_valid_number():
 def test_ssn_never_echoes_the_value():
     # Findings must report only the detector message, never the matched digits.
     hits = check_phi._detect_ssn("f.txt", 1, "123-45-6789")
+    assert hits  # must fire so the no-echo check below is non-vacuous
     assert all("123-45-6789" not in message for _, message in hits)
+
+
+def test_ssn_reports_a_one_based_column():
+    # col is the 1-based character offset of the match (m.start() + 1).
+    hits = check_phi._detect_ssn("f.txt", 1, "ssn 123-45-6789")
+    assert len(hits) == 1
+    assert hits[0][0] == 5  # "123" begins at index 4
 
 
 def test_ssn_rejects_areas_the_ssa_never_issues():
@@ -42,7 +51,8 @@ def test_ssn_rejects_zero_group_or_serial():
 
 
 def test_ssn_ignores_longer_digit_runs():
-    # The (?<!\d)/(?!\d) guards keep it off zip+4 and longer ID fragments.
+    # The (?<!\d) lookbehind and (?!\d) lookahead guards keep it off zip+4 and
+    # longer ID fragments.
     assert check_phi._detect_ssn("f.txt", 1, "00123-45-67890") == []
 
 
@@ -64,6 +74,11 @@ def test_mrn_matches_labeled_numbers():
 def test_mrn_requires_enough_digits():
     # 5–12 digits required, so a 4-digit value doesn't trip it.
     assert check_phi._detect_mrn("f.txt", 1, "mrn: 1234") == []
+
+
+def test_mrn_accepts_the_twelve_digit_upper_bound():
+    # The \d{5,12} bound should still fire at exactly 12 digits.
+    assert len(check_phi._detect_mrn("f.txt", 1, "mrn 123456789012")) == 1
 
 
 def test_mrn_needs_the_label():
@@ -155,3 +170,10 @@ def test_double_star_ignore_is_recursive():
 def test_split_list_handles_commas_and_newlines():
     assert check_phi._split_list("ssn, mrn\n dob ") == ["ssn", "mrn", "dob"]
     assert check_phi._split_list("") == []
+
+
+def test_inline_pragma_matches_phi_allow_but_not_allowlist():
+    # A `phi-allow` token on a line suppresses it; the word boundary keeps the
+    # pragma from also firing on "phi-allowlist" (e.g. a path mention).
+    assert check_phi.INLINE_PRAGMA_RE.search("ssn 123-45-6789  # phi-allow")
+    assert not check_phi.INLINE_PRAGMA_RE.search("see .github/phi-allowlist.txt")

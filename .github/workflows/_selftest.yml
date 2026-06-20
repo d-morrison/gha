@@ -57,11 +57,18 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # Pin Python the same way the check-phi composite action does, so the
+      # version is explicit and Dependabot-tracked (and pip needs no
+      # --break-system-packages on setup-python's non-externally-managed env).
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.x'
       - name: Run check-phi detector unit tests
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --quiet --break-system-packages pytest
+          python3 -m pip install --quiet pytest
           python3 -m pytest check-phi/tests/ -q
   # quarto-publish is brand new, so (like check-phi above) it isn't at the
   # released `@v1` tag the reusable workflow pins yet. Exercise the local
