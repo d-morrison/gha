@@ -35,10 +35,10 @@ inputs:
     default: ''
   output-dir:
     description: >-
-      Where the rendered site is staged from, relative to `path`. Must match the
-      `output-dir` set in the project's `_quarto.yml` (that setting is
-      authoritative; this input only locates the output to upload, it is not
-      passed to `quarto render`). Override only for a non-default output-dir.
+      Directory the rendered site is written to and staged from, relative to
+      `path`. Forwarded to `quarto render --output-dir`, so this input is
+      authoritative — it overrides any `output-dir` set in the project's
+      `_quarto.yml`. Defaults to Quarto's own default, `_site`.
     default: '_site'
 runs:
   using: composite
@@ -75,9 +75,13 @@ runs:
         packages: ${{ inputs.r-packages }}
 
     - name: Render Quarto project
-      uses: quarto-dev/quarto-actions/render@v2
-      with:
-        path: ${{ inputs.path }}
+      shell: bash
+      env:
+        PROJECT_PATH: ${{ inputs.path }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: |
+        set -euo pipefail
+        quarto render "$PROJECT_PATH" --output-dir "$OUTPUT_DIR"
 
     - name: Verify rendered output exists
       shell: bash
@@ -86,7 +90,7 @@ runs:
       run: |
         set -euo pipefail
         if [ ! -d "$SITE_DIR" ]; then
-          echo "::error::Rendered output not found at '$SITE_DIR'. If _quarto.yml sets a non-default output-dir, pass it via the 'output-dir' input."
+          echo "::error::Rendered output not found at '$SITE_DIR' after 'quarto render'; the render step produced no site."
           exit 1
         fi
 
