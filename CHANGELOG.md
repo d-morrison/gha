@@ -41,6 +41,20 @@ below with migration steps.
   array, so bibliography paths containing spaces are passed to the checker as
   intact single arguments instead of word-splitting (#30).
 
+### Fixed
+
+- `claude-code-review` now sets `allowed_bots: github-actions[bot]`, so the
+  review `claude.yml` re-dispatches after an `@claude` run pushes commits can
+  actually run. The action's agent mode (used by `workflow_dispatch`) blocks
+  bot actors by default, so dispatched reviews previously failed with "Workflow
+  initiated by non-human actor" — and, having entered the per-PR concurrency
+  group, canceled the parallel `synchronize` auto-review on their way out,
+  leaving the push with no review at all.
+- `claude-code-review`'s "collapse previous review comments" step is no longer
+  gated to `pull_request`, so a dispatched (`workflow_dispatch`) review that
+  wins the per-PR concurrency race also folds earlier pushes' review comments as
+  OUTDATED instead of leaving them expanded.
+
 ## [v1] — initial pilot set
 
 Reusable workflows + composite actions:
