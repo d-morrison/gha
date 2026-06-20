@@ -25,5 +25,5 @@ issue to be removed.
 
 | Repo | Workflows used | Notes |
 |------|----------------|-------|
-| [`Lacaedemon/sparta`](https://github.com/Lacaedemon/sparta) | `check-links`, `claude`, `claude-code-review`, `summary`, `quarto-publish` | Godot game; docs site published via `quarto-publish` (injects recorded gameplay clips through `pre-render-artifact`). |
 | [`d-morrison/qwt`](https://github.com/d-morrison/qwt) | `check-bibliography-dois`, `check-non-standard-chars`, `check-links` | Quarto website template (propagates to downstream books via "Use this template"). Phase 1 migration ([qwt#115](https://github.com/d-morrison/qwt/pull/115)); `summary` + the Claude workflows pending parity ([qwt#116](https://github.com/d-morrison/qwt/issues/116)). |
+| [`Lacaedemon/sparta`](https://github.com/Lacaedemon/sparta) | `check-links`, `claude`, `claude-code-review`, `summary`, `quarto-publish` | Godot game; docs site published via `quarto-publish` (injects recorded gameplay clips through `pre-render-artifact`). |
