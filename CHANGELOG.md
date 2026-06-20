@@ -15,8 +15,9 @@ below with migration steps.
 
 - `quarto-publish` — render a Quarto site and deploy it to GitHub Pages. A
   composite (`quarto-publish/action.yml`) sets up Quarto (optionally R/renv and
-  TinyTeX), renders a project at a given `path`, and stages `<path>/_site` as a
-  Pages artifact; the reusable workflow (`quarto-publish.yml`) wraps it and adds
+  TinyTeX), renders a project at a given `path`, and stages the rendered output
+  (`<path>/<output-dir>`, default `_site`) as a Pages artifact; the reusable
+  workflow (`quarto-publish.yml`) wraps it and adds
   the deploy, with optional submodule init and a `pre-render-artifact` input so
   a caller can inject build-time assets (e.g. recorded media) before render.
   First consumer: `Lacaedemon/sparta` (#37).

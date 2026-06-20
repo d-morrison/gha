@@ -66,6 +66,10 @@ on:
       SUBMODULES_TOKEN:
         description: Token with read access to private submodules (only needed when checkout-submodules is true).
         required: false
+    outputs:
+      page_url:
+        description: The deployed GitHub Pages URL (empty when deploy is false).
+        value: ${{ jobs.deploy.outputs.page_url }}
 
 jobs:
   # Build only: render and stage the Pages artifact. Held to contents:read with
@@ -120,6 +124,8 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deploy
