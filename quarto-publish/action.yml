@@ -35,8 +35,10 @@ inputs:
     default: ''
   output-dir:
     description: >-
-      The project's rendered output directory (Quarto's `output-dir`, relative
-      to `path`). Override only if `_quarto.yml` sets a non-default output-dir.
+      Where the rendered site is staged from, relative to `path`. Must match the
+      `output-dir` set in the project's `_quarto.yml` (that setting is
+      authoritative; this input only locates the output to upload, it is not
+      passed to `quarto render`). Override only for a non-default output-dir.
     default: '_site'
 runs:
   using: composite
