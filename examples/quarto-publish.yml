@@ -1,0 +1,43 @@
+# Copy to .github/workflows/quarto-publish.yml in your repo.
+#
+# Renders a Quarto site and deploys it to GitHub Pages. The calling job must
+# grant pages:write and id-token:write (repos default to a read-only token).
+#
+# One-time repo setup: Settings -> Pages -> Build and deployment -> Source =
+# "GitHub Actions". Until then the deploy step fails with a clear message.
+name: Quarto Publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # For a build-only PR preview (deploy: false below), also add:
+  # pull_request:
+
+# Let an in-flight Pages deploy finish rather than cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    permissions:
+      contents: read
+      # pages/id-token are used only by the deploy step. A build-only caller
+      # (deploy: false) can drop these two and keep just contents: read.
+      pages: write
+      id-token: write
+    uses: d-morrison/gha/.github/workflows/quarto-publish.yml@v1
+    # with:
+    #   path: website          # Quarto project lives in a subdir (default: repo root)
+    #   setup-r: true           # for R/knitr Quarto projects (default: false)
+    #   use-renv: true          # restore R deps with renv instead of r-packages
+    #   tinytex: true           # needed to render PDF outputs
+    #   output-dir: _site       # override only if _quarto.yml sets a non-default output-dir
+    #   checkout-submodules: true
+    #   pre-render-artifact: demo-media       # inject a prior job's artifact before render
+    #   pre-render-artifact-path: website/media
+    #   deploy: false           # build only (e.g. a PR preview); skips the Pages deploy job,
+    #                           # so the run needs only contents:read and no github-pages environment
+    # secrets:
+    #   SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}

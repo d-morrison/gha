@@ -13,6 +13,13 @@ below with migration steps.
 
 ### Added
 
+- `quarto-publish` — render a Quarto site and deploy it to GitHub Pages. A
+  composite (`quarto-publish/action.yml`) sets up Quarto (optionally R/renv and
+  TinyTeX), renders a project at a given `path`, and stages the rendered output
+  (`<path>/<output-dir>`, default `_site`) as a Pages artifact. The reusable
+  workflow (`quarto-publish.yml`) adds the deploy, optional submodule init, and
+  a `pre-render-artifact` input so a caller can inject build-time assets (e.g.
+  recorded media) before render. First consumer: `Lacaedemon/sparta` (#37).
 - PR-preview / publish family (#33) — centralizes the three-workflow preview
   pipeline rme carried inline:
   - `preview` composite action + `preview.yml` reusable workflow — build half;
@@ -56,6 +63,20 @@ below with migration steps.
 - `check-bibliography-dois` now collects `.bib` files NUL-delimited into a bash
   array, so bibliography paths containing spaces are passed to the checker as
   intact single arguments instead of word-splitting (#30).
+
+### Fixed
+
+- `claude-code-review` now sets `allowed_bots: github-actions[bot]`, so the
+  review `claude.yml` re-dispatches after an `@claude` run pushes commits can
+  actually run. The action's agent mode (used by `workflow_dispatch`) blocks
+  bot actors by default, so dispatched reviews previously failed with "Workflow
+  initiated by non-human actor" — and, having entered the per-PR concurrency
+  group, canceled the parallel `synchronize` auto-review on their way out,
+  leaving the push with no review at all.
+- `claude-code-review`'s "collapse previous review comments" step is no longer
+  gated to `pull_request`, so a dispatched (`workflow_dispatch`) review that
+  wins the per-PR concurrency race also folds earlier pushes' review comments as
+  OUTDATED instead of leaving them expanded.
 
 ## [v1] — initial pilot set
 

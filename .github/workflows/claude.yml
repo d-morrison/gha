@@ -517,10 +517,37 @@ jobs:
           BRANCH: ${{ steps.pr_checkout.outputs.branch }}
           STARTING_SHA: ${{ steps.pr_checkout.outputs.starting_sha }}
         run: |
+          # claude-code-action's restoreConfigFromBase resets the agent's own
+          # config files to the base branch before the run, so a PR can't
+          # rewrite the reviewing agent's instructions. On a PR that
+          # legitimately edits one of those files, that reset is a residual
+          # working-tree change; the auto-commit below would commit it and
+          # silently revert the PR's own config edits (#39). Force those paths
+          # back to their PR-tip (HEAD) state first so the sweep never commits a
+          # change to a config file the action itself reset.
+          #
+          # The list mirrors the action's SENSITIVE_PATHS (root-only, path-
+          # literal) from src/github/operations/restore-config.ts on the @v1
+          # line (read 2026-06). This copy can't detect upstream drift, so
+          # re-check it against that file when bumping claude-code-action.
+          #
+          # `git checkout HEAD -- "$cfg"` restores paths tracked in HEAD; for a
+          # path absent from HEAD but left on disk — a PR that DELETED a config
+          # file, which restoreConfigFromBase re-adds untracked — checkout can't
+          # match it, so fall back to `rm -rf` to honor the deletion. `rm -rf`
+          # covers files and dirs (.claude, .husky) and no-ops when the path is
+          # already gone. Net effect: every listed path ends matching HEAD, so
+          # the sweep is intentionally lossy for *uncommitted* config changes
+          # (edits, creations, or the reset) — the prompt tells Claude to commit
+          # its config edits, so only residual scratch work is lost.
+          for cfg in .claude .mcp.json .claude.json .gitmodules .ripgreprc CLAUDE.md CLAUDE.local.md .husky; do
+            git checkout HEAD -- "$cfg" 2>/dev/null || rm -rf "$cfg" 2>/dev/null || true
+          done
           # Sweep changes Claude staged or left untracked but never committed so
           # they aren't dropped (uncommitted edits never advance HEAD, and the
-          # push below only fires when HEAD moved). Mirrors the issue-trigger
-          # finalize step. HEAD is the PR's checked-out head branch here.
+          # push below only fires when HEAD moved). HEAD is the PR's checked-out
+          # head branch here. (The issue-trigger finalize step sweeps the same
+          # way but does NOT revert config first: no base-restore runs there.)
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "claude[bot]"
             git config user.email "claude[bot]@users.noreply.github.com"
@@ -737,7 +764,10 @@ jobs:
           # the no-new-commits check below doesn't discard them. The agent works
           # on the checked-out $BRANCH, so committing on HEAD lands on $BRANCH in
           # the normal case (a stray detach is the pre-existing edge the $BRANCH
-          # measurement below already tolerates).
+          # measurement below already tolerates). Unlike the PR-trigger sweep,
+          # this does NOT revert restoreConfigFromBase paths first: that restore
+          # only runs in PR contexts (there's no base branch on an issue
+          # trigger), so config edits here are genuine and must be committed.
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "claude[bot]"
             git config user.email "claude[bot]@users.noreply.github.com"

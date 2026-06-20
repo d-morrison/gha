@@ -48,6 +48,12 @@ jobs:
     # only one run mutates the reviewer list at a time. `cancel-in-progress:
     # true` is safe because this workflow is read-only (it never pushes, so it
     # can't cancel its own triggered run).
+    #
+    # A single @claude push can land here twice — the `synchronize` auto-review
+    # AND claude.yml's re-dispatched review, both keyed on the same PR number —
+    # so the later run supersedes (cancels) the earlier one. That's the intended
+    # dedupe: the survivor posts the current review and the collapse/cancel
+    # steps fold the other as OUTDATED, leaving one visible review per push.
     concurrency:
       group: claude-review-${{ github.event.pull_request.number || inputs.pr-number }}
       cancel-in-progress: true
@@ -193,6 +199,19 @@ jobs:
           # activity; the collapse step below folds priors up as OUTDATED.
           use_sticky_comment: 'false'
           display_report: 'true'
+          # Permit the github-actions bot to initiate this run. claude.yml
+          # re-dispatches a review after an @claude run pushes commits, and
+          # `gh workflow run` there runs as github-actions[bot]. But the
+          # action's AGENT mode — which workflow_dispatch uses (track_progress
+          # is 'false' above for dispatched runs) — blocks bot actors by
+          # default, failing with "Workflow initiated by non-human actor:
+          # github-actions". Without this, every re-dispatched review dies
+          # before it can post. Scoped to the one bot that legitimately
+          # dispatches us: the `if:` gate already filters bot actors out of the
+          # automatic pull_request path, so this only widens the dispatch path,
+          # which is itself reachable only via claude.yml's trusted-author gate
+          # (or a manual dispatch, which needs write access).
+          allowed_bots: 'github-actions[bot]'
 
       # With sticky disabled, every run leaves its own review comment. Collapse
       # the older ones (minimize as OUTDATED) so the PR shows one expanded,
@@ -200,8 +219,17 @@ jobs:
       # review comments are touched — identified by the run each comment links
       # to (its workflow `path` is this file) — so `@claude` task comments from
       # claude.yml (same `claude[bot]` author) are left alone.
+      #
+      # Not gated to pull_request: a dispatched (workflow_dispatch / agent-mode)
+      # review that wins the per-PR concurrency race must fold the earlier
+      # pushes' review comments too, or they linger now that dispatched runs can
+      # succeed (allowed_bots, above). The run_id→path match already scopes this
+      # to this workflow's comments, so running it on dispatched reviews is safe.
+      # (Whether a dispatched run's OWN summary comment is later foldable depends
+      # on it carrying an `actions/runs/<id>` link; if agent mode omits that, the
+      # comment simply isn't matched — a smaller residual than folding nothing.)
       - name: Collapse previous Claude review comments
-        if: steps.claude-review.outcome == 'success' && github.event_name == 'pull_request'
+        if: steps.claude-review.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -233,8 +261,9 @@ jobs:
             done
 
       # When this run is canceled (e.g. cancel-in-progress fires because a newer
-      # commit superseded it), tag mode's tracking comment is left stuck showing
-      # an unfinished "review in progress". Explain the cancellation in the
+      # commit — or a re-dispatched review of the same PR — superseded it), tag
+      # mode's tracking comment is left stuck showing an unfinished "review in
+      # progress". Explain the cancellation in the
       # comment, then fold it (minimize as OUTDATED) so the PR doesn't carry a
       # perpetual in-progress review. Tag mode only runs on pull_request, so a
       # tracking comment only exists there. The tracking comment is THIS run's
@@ -249,7 +278,7 @@ jobs:
           CURRENT_RUN_ID: ${{ github.run_id }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          NOTE=$(printf '> [!WARNING]\n> **Review canceled.** This run was canceled before it finished — usually because a newer commit superseded it (`cancel-in-progress`). A fresh review runs on the latest commit; see the [canceled run](%s).\n\n---\n\n' "$RUN_URL")
+          NOTE=$(printf '> [!WARNING]\n> **Review canceled.** This run was canceled before it finished — superseded by a newer review of the same PR (`cancel-in-progress`), e.g. a later commit or a re-dispatched review. A fresh review runs on the latest commit; see the [canceled run](%s).\n\n---\n\n' "$RUN_URL")
           # The paginated list already carries each comment's body, so capture it
           # here (base64-encoded so an embedded tab/newline can't break the
           # tab-delimited `read`) rather than making a second per-comment fetch.

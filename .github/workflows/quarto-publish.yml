@@ -1,0 +1,132 @@
+name: Quarto Publish (reusable)
+
+# Render a Quarto project and deploy it to GitHub Pages. Wraps the
+# `quarto-publish` composite (setup + render + stage the Pages artifact) and
+# adds the Pages deploy. Consumers target this workflow with a small caller stub
+# (see examples/quarto-publish.yml) pinned to @v1.
+#
+# One-time consumer setup: repo Settings -> Pages -> Source = "GitHub Actions".
+
+on:
+  workflow_call:
+    inputs:
+      path:
+        description: Path (in the caller repo) to the Quarto project to render (the dir with _quarto.yml).
+        type: string
+        default: '.'
+      setup-r:
+        description: Install R and project R dependencies before rendering (for R/knitr Quarto projects).
+        type: boolean
+        default: false
+      r-packages:
+        description: r-lib/actions package specs installed when setup-r is true and use-renv is false.
+        type: string
+        default: |
+          any::knitr
+          any::rmarkdown
+      use-renv:
+        description: Restore R dependencies with renv instead of r-packages (requires setup-r).
+        type: boolean
+        default: false
+      tinytex:
+        description: Install TinyTeX (needed to render PDF outputs).
+        type: boolean
+        default: false
+      apt-packages:
+        description: Extra apt packages to install before rendering (space-separated).
+        type: string
+        default: ''
+      output-dir:
+        description: Where the rendered site is staged from (must match the project's _quarto.yml output-dir; not passed to render). Override only for a non-default output-dir.
+        type: string
+        default: '_site'
+      checkout-submodules:
+        description: Initialize the caller's git submodules before rendering.
+        type: boolean
+        default: false
+      pre-render-artifact:
+        description: >-
+          Name of a workflow-run artifact to download into the project before
+          rendering — lets an earlier job inject build-time assets (e.g.
+          recorded media) the site references. Empty to skip.
+        type: string
+        default: ''
+      pre-render-artifact-path:
+        description: >-
+          Directory (in the caller repo) to extract pre-render-artifact into.
+          Defaults to the workspace root when omitted; set it when the artifact
+          should land in a subdirectory the site references.
+        type: string
+        default: ''
+      deploy:
+        description: Deploy the rendered site to GitHub Pages. Set false to build only (e.g. a PR preview).
+        type: boolean
+        default: true
+    secrets:
+      SUBMODULES_TOKEN:
+        description: Token with read access to private submodules (only needed when checkout-submodules is true).
+        required: false
+    outputs:
+      page_url:
+        description: The deployed GitHub Pages URL (empty when deploy is false).
+        value: ${{ jobs.deploy.outputs.page_url }}
+
+jobs:
+  # Build only: render and stage the Pages artifact. Held to contents:read with
+  # no environment, so a build-only caller (deploy: false, e.g. a PR preview) is
+  # never blocked by `github-pages` environment protection rules or granted
+  # Pages/id-token permissions it doesn't use.
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Checkout submodules
+        if: inputs.checkout-submodules
+        uses: d-morrison/gha/.github/actions/checkout-submodules@v1
+        with:
+          submodules-token: ${{ secrets.SUBMODULES_TOKEN }}
+
+      - name: Download pre-render artifact
+        # Best-effort: a caller's optional asset-builder job may have failed or
+        # produced nothing; the site still renders (with fallbacks) without it.
+        if: inputs.pre-render-artifact != ''
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.pre-render-artifact }}
+          path: ${{ inputs.pre-render-artifact-path }}
+
+      - name: Build Pages artifact
+        uses: d-morrison/gha/quarto-publish@v1
+        with:
+          path: ${{ inputs.path }}
+          setup-r: ${{ inputs.setup-r }}
+          r-packages: ${{ inputs.r-packages }}
+          use-renv: ${{ inputs.use-renv }}
+          tinytex: ${{ inputs.tinytex }}
+          apt-packages: ${{ inputs.apt-packages }}
+          output-dir: ${{ inputs.output-dir }}
+
+  # Deploy the staged artifact to Pages. Only this job needs the elevated
+  # permissions and the github-pages environment, and it's skipped entirely
+  # when deploy is false.
+  deploy:
+    needs: build
+    if: inputs.deploy
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

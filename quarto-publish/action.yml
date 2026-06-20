@@ -1,0 +1,96 @@
+name: Build a Quarto site for GitHub Pages
+description: >-
+  Set up Quarto (optionally R/renv and TinyTeX), render a Quarto project, and
+  stage its rendered output as a GitHub Pages artifact. The reusable
+  quarto-publish.yml workflow wraps this and adds the Pages deploy; callers that
+  only want to build (e.g. a preview job) can use this composite directly.
+inputs:
+  path:
+    description: >-
+      Path (relative to the caller repo root) to the Quarto project to render:
+      the directory containing _quarto.yml. Its rendered output (at the
+      output-dir below) is staged for Pages.
+    default: '.'
+  setup-r:
+    description: >-
+      Install R and the project's R dependencies before rendering. Enable for
+      R/knitr Quarto projects; leave false for pure-markdown sites.
+    default: 'false'
+  r-packages:
+    description: >-
+      r-lib/actions package specs to install when setup-r is true and use-renv
+      is false (newline- or comma-separated, e.g. "any::knitr\nany::rmarkdown").
+    default: |
+      any::knitr
+      any::rmarkdown
+  use-renv:
+    description: >-
+      Restore R dependencies with renv instead of r-packages (requires setup-r).
+    default: 'false'
+  tinytex:
+    description: Install TinyTeX (needed to render PDF outputs).
+    default: 'false'
+  apt-packages:
+    description: Extra apt packages to install before rendering (space-separated).
+    default: ''
+  output-dir:
+    description: >-
+      Where the rendered site is staged from, relative to `path`. Must match the
+      `output-dir` set in the project's `_quarto.yml` (that setting is
+      authoritative; this input only locates the output to upload, it is not
+      passed to `quarto render`). Override only for a non-default output-dir.
+    default: '_site'
+runs:
+  using: composite
+  steps:
+    - name: Install apt packages
+      if: inputs.apt-packages != ''
+      shell: bash
+      env:
+        APT_PACKAGES: ${{ inputs.apt-packages }}
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y $APT_PACKAGES
+
+    - name: Set up Quarto
+      uses: quarto-dev/quarto-actions/setup@v2
+      with:
+        tinytex: ${{ inputs.tinytex }}
+
+    - name: Set up R
+      if: inputs.setup-r == 'true'
+      uses: r-lib/actions/setup-r@v2
+      with:
+        use-public-rspm: true
+
+    - name: Restore R dependencies (renv)
+      if: inputs.setup-r == 'true' && inputs.use-renv == 'true'
+      uses: r-lib/actions/setup-renv@v2
+
+    - name: Install R dependencies
+      if: inputs.setup-r == 'true' && inputs.use-renv != 'true'
+      uses: r-lib/actions/setup-r-dependencies@v2
+      with:
+        packages: ${{ inputs.r-packages }}
+
+    - name: Render Quarto project
+      uses: quarto-dev/quarto-actions/render@v2
+      with:
+        path: ${{ inputs.path }}
+
+    - name: Verify rendered output exists
+      shell: bash
+      env:
+        SITE_DIR: ${{ inputs.path }}/${{ inputs.output-dir }}
+      run: |
+        set -euo pipefail
+        if [ ! -d "$SITE_DIR" ]; then
+          echo "::error::Rendered output not found at '$SITE_DIR'. If _quarto.yml sets a non-default output-dir, pass it via the 'output-dir' input."
+          exit 1
+        fi
+
+    - name: Upload Pages artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ${{ inputs.path }}/${{ inputs.output-dir }}

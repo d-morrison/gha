@@ -48,6 +48,7 @@ Pin to `@v1` (a moving major tag updated as fixes land). Do not reference
 | `check-news.yml` | Enforce a `NEWS.md` changelog entry on PRs (wraps `UCD-SERG/changelog-check-action`) | `changelog` |
 | `claude.yml` | Agent-mode Claude Code bot: responds to `@claude` mentions, edits files, opens/updates PRs | `setup-r`, `install-quarto`, `use-renv`, `apt-packages`, `pip-packages`, `checkout-submodules`, `link-skills`, `eager-pr`, `prompt-addendum`, `webfetch-allowlist-url`, `reviewer` |
 | `claude-code-review.yml` | Read-only Claude PR review (runs the `code-review` plugin; inline findings on `pull_request` runs, consolidated summary on dispatched runs) | `pr-number`, `prompt-addendum`, `checkout-submodules` |
+| `quarto-publish.yml` | Render a Quarto site and deploy it to GitHub Pages | `path`, `setup-r`, `r-packages`, `use-renv`, `tinytex`, `apt-packages`, `output-dir`, `checkout-submodules`, `pre-render-artifact`, `pre-render-artifact-path`, `deploy` |
 | `preview.yml` | Build half of the PR-preview family: render a Quarto site in the (possibly fork) PR context and upload it + PR metadata as an artifact (read-only) | `r-version`, `apt-packages`, `use-renv`, `install-package`, `setup-chrome`, `submodules`, `render-profile` |
 | `preview-deploy.yml` | Deploy half: on `workflow_run` completion of the build, publish the artifact to `gh-pages` and comment the preview link (base-repo context) | — |
 | `cleanup-pr-previews.yml` | Housekeeping: delete `gh-pages` preview directories for PRs that are no longer open | `preview-dir` |
@@ -64,6 +65,10 @@ that need to write must have the **caller** grant it on the calling job:
   `models: read`, `contents: read`.
 - `check-bibliography-dois`, `check-non-standard-chars`, `check-phi` → only
   `contents: read` (the default), so no `permissions:` block is needed.
+- `quarto-publish` (deploys to GitHub Pages) → grant `pages: write`,
+  `id-token: write`, `contents: read`, and set Settings → Pages → Source =
+  "GitHub Actions" once. Build-only callers (`deploy: false`) need just
+  `contents: read`.
 - `claude` (pushes branches, opens PRs, dispatches the review workflow) → grant
   `contents: write`, `pull-requests: write`, `issues: write`, `id-token: write`,
   `actions: write`, and add the `CLAUDE_CODE_OAUTH_TOKEN` secret.
