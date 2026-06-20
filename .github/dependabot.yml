@@ -5,8 +5,8 @@
 # third-party actions"). Dependabot bumps those pins as upstreams publish new
 # releases, so the pins stay current instead of silently freezing.
 #
-# `directory: "/"` scans `.github/workflows/`; the composite actions live in their
-# own folders, so each one with external `uses:` is listed explicitly. First-party
+# The `/` entry below scans `.github/workflows/`; the composite actions live in
+# their own folders, so each one with external `uses:` is listed explicitly. First-party
 # `d-morrison/gha/*@v1` self-references and the `examples/` templates intentionally
 # track the `@v1` major tag and are not SHA-pinned, so they need no Dependabot
 # coverage.
