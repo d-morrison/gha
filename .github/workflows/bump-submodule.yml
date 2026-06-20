@@ -64,7 +64,7 @@ jobs:
             git -C "$SUBMODULE_PATH" fetch --depth 1 origin "$REMOTE_BRANCH"
             git -C "$SUBMODULE_PATH" checkout --detach FETCH_HEAD
           else
-            git submodule update --remote "$SUBMODULE_PATH"
+            git submodule update --remote --depth 1 "$SUBMODULE_PATH"
           fi
           new=$(git -C "$SUBMODULE_PATH" rev-parse HEAD)
           echo "old=${old}" >> "$GITHUB_OUTPUT"

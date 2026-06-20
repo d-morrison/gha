@@ -16,12 +16,16 @@ on:
         required: true
       source-ref:
         description: >-
-          Upstream ref to pin to (branch, tag, or SHA). Resolved to a concrete
-          commit SHA, which is recorded in the manifest.
+          Upstream ref to track (branch, tag, or SHA). Each file is pinned to the
+          last commit on this ref that touched it; the manifest records this ref
+          and those per-file commits.
         type: string
         default: main
       source-paths:
-        description: Newline-separated list of file paths in the upstream repo to vendor.
+        description: >-
+          Newline-separated list of file paths in the upstream repo to vendor.
+          Each is written to dest-dir under its basename (the upstream directory
+          structure is flattened); two paths sharing a basename are rejected.
         type: string
         required: true
       dest-dir:
@@ -94,7 +98,7 @@ jobs:
             # commit. This is what keeps the two repos' auto-PRs from ping-ponging.
             file_commit=$(gh api \
               "repos/${SOURCE_REPO}/commits?sha=${SOURCE_REF}&path=${path}&per_page=1" \
-              --jq '.[0].sha')
+              --jq '.[0].sha // empty')
             if [ -z "$file_commit" ]; then
               echo "::error::No commit found for ${path} in ${SOURCE_REPO}@${SOURCE_REF}."
               exit 1
