@@ -19,7 +19,9 @@ composite action plus a `workflow_call` reusable workflow. Consumers pin to `@v1
   `sync-shared-fragments`).
 - `.github/workflows/` — the `workflow_call` reusable workflows that wrap the
   composites (one per capability, plus `claude*` variants), and `_selftest.yml`,
-  which exercises the local composites on every PR. Some workflows here are
+  which exercises composites on every PR — local `./` refs for pre-release
+  capabilities, and `@v1` through the reusable-workflow wrappers for stable ones.
+  Some workflows here are
   standalone and wrap no root composite — e.g. `check-news.yml`, `summary.yml`,
   `cleanup-pr-previews.yml`, `slide-major-tag.yml`, `preview-deploy.yml`,
   `bump-submodule.yml`, and `sync-shared-fragments.yml`.
@@ -40,8 +42,8 @@ local `./<name>` ref until release.
 `check-phi/tests/test_detectors.py` is a pytest suite pinning each PHI detector's
 positive and negative behavior. Run it with `python3 -m pytest check-phi/tests/ -q`;
 CI runs it as the `phi-tests` job in `_selftest.yml`. There's no broader unit-test
-harness — most capabilities are validated end-to-end by `_selftest.yml` running
-the composite against a fixture.
+harness — most capabilities are validated end-to-end by `_selftest.yml` against
+a fixture (stable capabilities at `@v1`, pre-release ones from local source).
 
 ## GitHub access in remote / web sessions
 
