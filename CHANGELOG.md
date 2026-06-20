@@ -50,6 +50,16 @@ below with migration steps.
 
 ### Fixed
 
+- **Example caller stubs now pass secrets explicitly instead of `secrets:
+  inherit`.** GitHub only inherits org/repo secrets into a reusable workflow
+  owned by the *same* org/user, so a cross-owner consumer (e.g. a `UCD-SERG`-org
+  repo calling these `d-morrison`-user-owned workflows) inherited an empty
+  `CLAUDE_CODE_OAUTH_TOKEN` and every `@claude` run failed env-validation
+  ("… is required when using direct Anthropic API"). `examples/claude.yml` and
+  `examples/claude-code-review.yml` now pass `CLAUDE_CODE_OAUTH_TOKEN` (and the
+  optional `SUBMODULES_TOKEN` / `WORKFLOW_TOKEN`) explicitly, which resolves
+  caller-side and works regardless of owner. Existing consumers copied from the
+  old stubs must make the same change (#49).
 - `claude-code-review` now sets `allowed_bots: github-actions[bot]`, so the
   review `claude.yml` re-dispatches after an `@claude` run pushes commits can
   actually run. The action's agent mode (used by `workflow_dispatch`) blocks
