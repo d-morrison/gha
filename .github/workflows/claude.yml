@@ -830,6 +830,11 @@ jobs:
       # safe even when the trigger comment was itself a review request (the step
       # above handles that; TRIGGER_TS is strict-greater, so the trigger comment
       # isn't double-counted here). (qwt #90)
+      #
+      # Intentionally NOT gated on steps.claude.outcome (unlike the 🚀 react
+      # step): a review dispatch is independent of the agent's run, so a late
+      # `@claude review` is honored even if the agent failed/was cancelled — the
+      # review just runs against the PR's current state.
       - name: Dispatch review for a late @claude review comment
         if: |
           always() &&

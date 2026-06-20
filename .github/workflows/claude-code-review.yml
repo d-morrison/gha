@@ -34,10 +34,12 @@ on:
       allowed-bots:
         description: >-
           Comma-separated bot actors the reviewer accepts (passed to
-          claude-code-action's allowed_bots). Defaults to github-actions[bot] so
-          claude.yml's re-dispatched reviews — which run as that actor — aren't
-          rejected as "non-human". Set e.g. "github-actions[bot],claude" for
-          repos whose bot-authored pushes should also be reviewable.
+          claude-code-action's allowed_bots). The default, github-actions[bot],
+          is the actor `gh workflow run` uses when claude.yml re-dispatches a
+          review, so those dispatched reviews aren't rejected as "non-human" —
+          which is all gha's own setup needs (the job `if:` below already filters
+          bot-authored pushes off the automatic pull_request path). Override only
+          if you loosen that gate to review bot-authored pushes directly.
         type: string
         default: 'github-actions[bot]'
     secrets:
@@ -98,8 +100,11 @@ jobs:
       # detect that case and skip the review; it runs normally once merged. The
       # file checked is the CALLER's review workflow, derived from
       # github.workflow_ref (owner/repo/.github/workflows/<file>@ref ->
-      # .github/workflows/<file>), so it works whatever stub name the consumer
-      # uses. (Ported from qwt; keyed off github.workflow_ref — gha #45.)
+      # .github/workflows/<file>): in a workflow_call run the github context is
+      # the caller's, so workflow_ref is the consumer's stub — the callee
+      # (reusable) path is exposed separately as github.job_workflow_ref — hence
+      # this matches whatever name the consumer's stub uses, not just the
+      # claude-code-review.yml convention. (Ported from qwt — gha #45.)
       - name: Skip self-review when the PR edits this workflow
         id: selfmod
         env:
