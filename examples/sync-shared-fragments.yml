@@ -1,0 +1,32 @@
+# Copy to .github/workflows/sync-shared-fragments.yml in your repo.
+# Periodically vendor shared fragments from an upstream repo and open a PR when
+# they change. Use this instead of a second submodule when two repos share each
+# other's content (a mutual submodule would recurse). Requires Settings ->
+# Actions -> General -> "Allow GitHub Actions to create and approve pull
+# requests" (the integrated GITHUB_TOKEN opens the PR).
+name: Sync shared fragments
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1' # Weekly on Monday at 06:00 UTC
+
+jobs:
+  sync:
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: d-morrison/gha/.github/workflows/sync-shared-fragments.yml@v1
+    with:
+      source-repo: UCD-SERG/lab-manual
+      source-paths: |
+        shared/prompt-formats.md
+        shared/copilot-review-before-human.md
+      dest-dir: shared/vendored
+      manifest-path: shared/vendored/MANIFEST.json
+    secrets:
+      # Needed only if source-repo is private; omit for public upstreams.
+      SOURCE_TOKEN: ${{ secrets.SOURCE_TOKEN }}
+      # Set only if the bot must push to a protected branch; otherwise omit and
+      # the push falls back to GITHUB_TOKEN.
+      WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}

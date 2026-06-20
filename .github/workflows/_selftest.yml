@@ -70,3 +70,34 @@ jobs:
         with:
           path: _ci-quarto-site
           output-dir: docs
+  # bump-submodule / sync-shared-fragments open PRs (write side effects), so the
+  # selftest can't run them end-to-end. Exercise the shared open-sync-pr
+  # composite's no-op path instead: on a clean tree it must report no change and
+  # neither push nor open a PR. Like check-phi/quarto-publish above, use the
+  # local `./` ref since the action isn't at `@v1` until release.
+  sync-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: open-sync-pr no-ops on a clean tree
+        id: nochange
+        uses: ./open-sync-pr
+        with:
+          branch: ci-selftest-open-sync-pr
+          commit-message: 'selftest: must not be committed'
+          token: ${{ github.token }}
+      - name: Assert nothing was committed or opened
+        shell: bash
+        env:
+          CHANGED: ${{ steps.nochange.outputs.changed }}
+          PR_URL: ${{ steps.nochange.outputs.pr-url }}
+        run: |
+          set -euo pipefail
+          if [ "$CHANGED" != "false" ] || [ -n "$PR_URL" ]; then
+            echo "::error::open-sync-pr should no-op on a clean tree (changed=${CHANGED}, pr-url=${PR_URL})."
+            exit 1
+          fi
+          echo "open-sync-pr correctly no-opped on a clean tree."

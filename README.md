@@ -52,6 +52,8 @@ Pin to `@v1` (a moving major tag updated as fixes land). Do not reference
 | `preview.yml` | Build half of the PR-preview family: render a Quarto site in the (possibly fork) PR context and upload it + PR metadata as an artifact (read-only) | `r-version`, `apt-packages`, `use-renv`, `install-package`, `setup-chrome`, `submodules`, `render-profile` |
 | `preview-deploy.yml` | Deploy half: on `workflow_run` completion of the build, publish the artifact to `gh-pages` and comment the preview link (base-repo context) | — |
 | `cleanup-pr-previews.yml` | Housekeeping: delete `gh-pages` preview directories for PRs that are no longer open | `preview-dir` |
+| `bump-submodule.yml` | Update a named submodule to its upstream HEAD and open a PR when the pointer moves | `submodule-path`, `remote-branch`, `base-branch`, `pr-branch` |
+| `sync-shared-fragments.yml` | Vendor files from an upstream repo (pinned to a commit, recorded in a manifest) and open a PR when they change — avoids a recursive mutual submodule | `source-repo`, `source-ref`, `source-paths`, `dest-dir`, `manifest-path` |
 
 ## Permissions
 
@@ -94,6 +96,12 @@ that need to write must have the **caller** grant it on the calling job:
   `contents: write`, `pull-requests: write`, `actions: read`.
 - `cleanup-pr-previews` (commits deletions to `gh-pages`) → grant
   `contents: write`, `pull-requests: read`.
+- `bump-submodule`, `sync-shared-fragments` (open a PR) → grant `contents: write`,
+  `pull-requests: write`, and enable Settings → Actions → General → "Allow
+  GitHub Actions to create and approve pull requests" so the integrated
+  `GITHUB_TOKEN` can open the PR. For private submodules, `bump-submodule` also
+  needs a `SUBMODULES_TOKEN` secret. Add a `WORKFLOW_TOKEN` only to push to a
+  protected branch; otherwise pushes fall back to `GITHUB_TOKEN`.
 
 The stubs in [`examples/`](examples) already include the right `permissions:`
 blocks — copy them as-is.
@@ -161,6 +169,30 @@ package list, renv on/off, `R CMD INSTALL .` on/off, Chrome, submodules, render
 profile). Label-gated extras are preserved: add `preview:pdf`, `preview:docx`,
 or `preview:revealjs` to a PR to render those formats too, and `clear freezer`
 to bypass the Quarto freeze cache.
+
+## Shared-content sync (`bump-submodule` + `sync-shared-fragments`)
+
+Two repos can share single-source-of-truth content and keep both copies current
+without hand-bumping. The pair handles the two directions:
+
+- **`bump-submodule`** — for the side that vendors the other repo as a git
+  submodule. A scheduled run advances the submodule to its upstream HEAD and
+  opens a PR when it moved. (Used by `UCD-SERG/lab-manual`, which carries
+  `d-morrison/ai-config` as `.ai-config`.)
+- **`sync-shared-fragments`** — for the side that can't add a submodule because
+  the other repo already submodules *it* (a mutual submodule would recurse).
+  Instead it vendors a pinned **copy** of the named files into a `dest-dir`,
+  records the source repo and commit in a JSON manifest, and opens a PR when the
+  copy changes. (Used by `d-morrison/ai-config` to vendor the lab manual's
+  authored fragments.) Don't hand-edit the vendored copies — edit them upstream
+  and let the workflow refresh them; a consumer-side drift check can assert the
+  copy matches the pinned commit.
+
+Both reuse the `open-sync-pr` composite, which commits staged changes to a
+reused automation branch and opens or updates one PR (no-op when nothing
+changed). Schedule and `workflow_dispatch` triggers live in the caller stubs.
+Path-filter or scope each side to the *other* repo's shared content (not its own
+pointer/manifest) so the two auto-PRs don't ping-pong.
 
 ## Versioning
 
