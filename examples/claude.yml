@@ -1,10 +1,10 @@
 # Copy to .github/workflows/claude.yml in your repo.
 # NOTE: requires the CLAUDE_CODE_OAUTH_TOKEN repository secret. The calling job
 # grants write permissions so Claude can push branches and open PRs. Pass the
-# secrets EXPLICITLY (below), NOT via `secrets: inherit`: GitHub only inherits
-# secrets into a reusable workflow owned by the SAME org/user, so a cross-owner
-# caller (e.g. a UCD-SERG-org repo calling this d-morrison user-owned workflow)
-# inherits an EMPTY token.
+# secrets explicitly (below) rather than via `secrets: inherit`: GitHub only
+# inherits secrets into a reusable workflow owned by the same org/user, so a
+# cross-owner caller (e.g. a UCD-SERG-org repo calling this d-morrison
+# user-owned workflow) inherits an empty token.
 name: Claude Code
 
 on:
