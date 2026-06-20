@@ -25,4 +25,4 @@ issue to be removed.
 
 | Repo | Workflows used | Notes |
 |------|----------------|-------|
-| _(none registered yet — add yours)_ | | |
+| [`Lacaedemon/sparta`](https://github.com/Lacaedemon/sparta) | `check-links`, `claude`, `claude-code-review`, `summary`, `quarto-publish` | Godot game; docs site published via `quarto-publish` (injects recorded gameplay clips through `pre-render-artifact`). |
