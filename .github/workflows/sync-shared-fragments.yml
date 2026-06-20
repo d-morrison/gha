@@ -88,9 +88,12 @@ jobs:
             # Raw media type returns the file content directly (no base64).
             gh api -H "Accept: application/vnd.github.raw" \
               "repos/${SOURCE_REPO}/contents/${path}?ref=${file_commit}" > "$dest"
+            # Record a content hash so a consumer drift-check can verify the
+            # vendored copy wasn't hand-edited without any network access.
+            sha=$(sha256sum "$dest" | cut -d' ' -f1)
             entries=$(echo "$entries" | jq \
-              --arg p "$dest" --arg sp "$path" --arg c "$file_commit" --arg repo "$SOURCE_REPO" \
-              '. + [{"path": $p, "source_path": $sp, "commit": $c, "source_url": ("https://github.com/" + $repo + "/blob/" + $c + "/" + $sp)}]')
+              --arg p "$dest" --arg sp "$path" --arg c "$file_commit" --arg sha "$sha" --arg repo "$SOURCE_REPO" \
+              '. + [{"path": $p, "source_path": $sp, "commit": $c, "sha256": $sha, "source_url": ("https://github.com/" + $repo + "/blob/" + $c + "/" + $sp)}]')
           done <<< "$SOURCE_PATHS"
 
           if [ -n "$MANIFEST_PATH" ]; then
