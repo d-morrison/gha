@@ -11,6 +11,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # For a build-only PR preview (deploy: false below), also add:
+  # pull_request:
 
 # Let an in-flight Pages deploy finish rather than cancelling it.
 concurrency:
