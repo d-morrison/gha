@@ -1,0 +1,19 @@
+# Copy to .github/workflows/cleanup-pr-previews.yml in your repo.
+# Housekeeping half of the PR-preview family: periodically deletes gh-pages
+# preview directories for PRs that are no longer open. The calling job grants
+# contents:write so it can commit the deletions back to gh-pages.
+name: Clean up PR Previews
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sunday at midnight UTC
+
+jobs:
+  cleanup:
+    permissions:
+      contents: write
+      pull-requests: read
+    uses: d-morrison/gha/.github/workflows/cleanup-pr-previews.yml@v1
+    # with:
+    #   preview-dir: pr-preview   # gh-pages dir holding the per-PR previews

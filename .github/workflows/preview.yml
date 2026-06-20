@@ -1,0 +1,82 @@
+name: Quarto Preview Build (reusable)
+
+# Build half of the PR-preview family. Runs read-only in the (possibly fork)
+# PR context and uploads the rendered site + PR metadata as an artifact; the
+# deploy half (preview-deploy.yml) picks that up in the base-repo context via
+# workflow_run and publishes to gh-pages. Keeping the two halves split is the
+# trust boundary — never collapse them into one privileged job.
+#
+# The caller stub (see examples/preview.yml) owns the `on: pull_request:`
+# triggers (types + paths); this reusable workflow inherits the caller's event
+# context.
+
+on:
+  workflow_call:
+    inputs:
+      r-version:
+        description: R version to install with r-lib/actions/setup-r.
+        type: string
+        default: '4.6.0'
+      apt-packages:
+        description: >-
+          System (apt) packages to install before R/Quarto setup, space-separated.
+          Defaults to the shared renv stack plus the preview build helpers; set
+          to an empty string to skip the apt step.
+        type: string
+        default: >-
+          jags libcurl4-openssl-dev libpng-dev libfontconfig1-dev libjpeg-dev
+          libglpk-dev libharfbuzz-dev libfribidi-dev libfreetype6-dev libtiff5-dev
+          libwebp-dev libnode109 cmake libgit2-dev libnode-dev libx11-dev pandoc
+      use-renv:
+        description: Restore R dependencies with renv. Set false for non-renv repos.
+        type: boolean
+        default: true
+      install-package:
+        description: Run `R CMD INSTALL .` to install the caller repo as a local package before rendering.
+        type: boolean
+        default: true
+      setup-chrome:
+        description: Install Chrome (needed by Quarto for revealjs / screenshot rendering).
+        type: boolean
+        default: true
+      submodules:
+        description: Passed to actions/checkout `submodules` ('recursive', 'true', or 'false').
+        type: string
+        default: 'recursive'
+      render-profile:
+        description: Quarto `--profile` to render with.
+        type: string
+        default: 'website'
+
+jobs:
+  build:
+    # Run for all events except labels other than the recognized preview labels,
+    # so an unrelated label add doesn't spin up a (useless) build.
+    if: github.event.action != 'labeled' || contains(fromJSON('["clear freezer", "preview:pdf", "preview:docx", "preview:revealjs"]'), github.event.label.name)
+    runs-on: ubuntu-latest
+    # Cancel an in-progress preview build when a newer commit on the same ref
+    # supersedes it. Without cancel-in-progress the default is false, so a fresh
+    # push QUEUES behind the stale run and the up-to-date preview is delayed
+    # until the obsolete one finishes (see d-morrison/rme#812).
+    concurrency:
+      group: preview-${{ github.ref }}
+      cancel-in-progress: true
+    # Read-only: this job runs in the fork's restricted context and must never
+    # write to the base repo. All writes are handled by preview-deploy.yml,
+    # which runs in the base-repo context via workflow_run.
+    permissions:
+      contents: read
+    steps:
+      - name: Build preview
+        uses: d-morrison/gha/preview@v1
+        # The `type: boolean` inputs above are coerced to the strings
+        # 'true'/'false' when passed to the composite action, which compares
+        # them as strings (e.g. `inputs.use-renv == 'true'`).
+        with:
+          r-version: ${{ inputs.r-version }}
+          apt-packages: ${{ inputs.apt-packages }}
+          use-renv: ${{ inputs.use-renv }}
+          install-package: ${{ inputs.install-package }}
+          setup-chrome: ${{ inputs.setup-chrome }}
+          submodules: ${{ inputs.submodules }}
+          render-profile: ${{ inputs.render-profile }}

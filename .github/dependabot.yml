@@ -1,0 +1,33 @@
+# Keep SHA-pinned third-party actions current.
+#
+# Every third-party action in this repo is pinned to a full commit SHA (with the
+# version in a trailing comment) for supply-chain hardening; see README ("Pinning
+# third-party actions"). Dependabot bumps those pins as upstreams publish new
+# releases, so the pins stay current instead of silently freezing.
+#
+# The `/` entry below scans `.github/workflows/`; the composite actions live in
+# their own folders, so each one with external `uses:` is listed explicitly. First-party
+# `d-morrison/gha/*@v1` self-references and the `examples/` templates intentionally
+# track the `@v1` major tag and are not SHA-pinned, so they need no Dependabot
+# coverage.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directories:
+      - "/" # .github/workflows/
+      - "/check-bibliography-dois"
+      - "/check-links"
+      - "/check-non-standard-chars"
+      - "/check-phi"
+      - "/preview"
+      - "/quarto-publish"
+    schedule:
+      interval: "weekly"
+    # Batch all action bumps into one PR per run to keep review noise low.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
