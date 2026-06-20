@@ -42,6 +42,24 @@ jobs:
           # exercises them all; this repo's tree is identifier-free.
           detectors: 'ssn,mrn,dob,csv_phi_header,phone,email'
           base-ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+  # The phi job above proves the action runs clean on an identifier-free tree;
+  # this job unit-tests the detector functions directly (positive + negative
+  # fixtures per detector, incl. the csv_phi_header line-1/suffix edge cases), so
+  # a regression in the regexes/heuristics is caught even when this repo's own
+  # tree wouldn't trip it.
+  phi-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Run check-phi detector unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --break-system-packages pytest
+          python3 -m pytest check-phi/tests/ -q
   # quarto-publish is brand new, so (like check-phi above) it isn't at the
   # released `@v1` tag the reusable workflow pins yet. Exercise the local
   # composite directly against a throwaway fixture, build-only (no deploy), so
