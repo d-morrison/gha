@@ -53,13 +53,13 @@ each comment, then submit once at the end. Watch and respond to PR activity with
 A task often needs files from a *sibling* repo (e.g. `d-morrison/qwt`) that the
 session's GitHub MCP tools aren't scoped to — those calls fail with
 `Access denied: repository … is not configured for this session`. **Don't report
-the repo as inaccessible from that alone.** First try the browser/raw path: any
-**public** repo's files are fetchable over plain HTTP with `curl` (or `WebFetch`)
-at `https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>`, which works
+the repo as inaccessible from that alone.** First try the raw HTTP URL directly:
+any **public** repo's files are fetchable with `curl` (or `WebFetch`) at
+`https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>`, which works
 even when `gh` and the MCP tools don't. (This is how qwt's standalone workflows
 were obtained to port them faithfully into the reusable workflows for #44/#45.)
-Only fall back to "can't access it" — or to `mcp__claude-code-remote__list_repos`
-/ `add_repo` if available — after the raw fetch also fails (private repo, or the
+Only fall back to "can't access it" — or to whatever session tooling can add a
+repo to scope, if any — after the raw fetch also fails (private repo, or the
 network policy blocks the host).
 
 ## Code review guidelines
