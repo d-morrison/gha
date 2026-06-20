@@ -55,6 +55,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Persist a push-capable token so open-sync-pr can push without putting
+          # the token in the remote URL.
+          token: ${{ secrets.WORKFLOW_TOKEN || github.token }}
 
       - name: Vendor upstream fragments
         id: fetch
@@ -71,8 +75,19 @@ jobs:
           mkdir -p "$DEST_DIR"
 
           entries='[]'
+          declare -A seen_basenames
           while IFS= read -r path; do
             [ -z "$path" ] && continue
+            # Flatten to the basename under dest-dir, so guard against two source
+            # paths that share one (they'd silently overwrite each other). Track
+            # only names written this run -- the pre-existing vendored copies are
+            # expected to be present.
+            base=$(basename "$path")
+            if [ -n "${seen_basenames[$base]:-}" ]; then
+              echo "::error::Basename collision: ${path} and ${seen_basenames[$base]} both map to ${DEST_DIR}/${base}."
+              exit 1
+            fi
+            seen_basenames[$base]="$path"
             # Pin each file to the last commit that touched it, not the bare
             # upstream HEAD, so the manifest changes (and a PR opens) only when a
             # vendored file actually changes -- not on every unrelated upstream
@@ -84,7 +99,7 @@ jobs:
               echo "::error::No commit found for ${path} in ${SOURCE_REPO}@${SOURCE_REF}."
               exit 1
             fi
-            dest="${DEST_DIR}/$(basename "$path")"
+            dest="${DEST_DIR}/${base}"
             # Raw media type returns the file content directly (no base64).
             gh api -H "Accept: application/vnd.github.raw" \
               "repos/${SOURCE_REPO}/contents/${path}?ref=${file_commit}" > "$dest"
@@ -98,8 +113,8 @@ jobs:
 
           if [ -n "$MANIFEST_PATH" ]; then
             mkdir -p "$(dirname "$MANIFEST_PATH")"
-            jq -n --arg repo "$SOURCE_REPO" --argjson files "$entries" \
-              '{source_repo: $repo, files: $files}' > "$MANIFEST_PATH"
+            jq -n --arg repo "$SOURCE_REPO" --arg ref "$SOURCE_REF" --argjson files "$entries" \
+              '{source_repo: $repo, source_ref: $ref, files: $files}' > "$MANIFEST_PATH"
           fi
 
       - name: Open PR if the vendored copy changed
@@ -107,6 +122,7 @@ jobs:
         with:
           branch: ${{ inputs.pr-branch }}
           base: ${{ inputs.base-branch }}
+          paths: ${{ inputs.dest-dir }} ${{ inputs.manifest-path }}
           commit-message: "chore: sync vendored fragments from ${{ inputs.source-repo }}"
           pr-body: |
             Automated refresh of vendored fragments from

@@ -42,6 +42,10 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Persist a push-capable token so open-sync-pr can push without putting
+          # the token in the remote URL.
+          token: ${{ secrets.WORKFLOW_TOKEN || github.token }}
 
       - name: Initialize submodules
         uses: d-morrison/gha/.github/actions/checkout-submodules@v1
@@ -60,7 +64,7 @@ jobs:
             git -C "$SUBMODULE_PATH" fetch --depth 1 origin "$REMOTE_BRANCH"
             git -C "$SUBMODULE_PATH" checkout --detach FETCH_HEAD
           else
-            git submodule update --remote --recursive "$SUBMODULE_PATH"
+            git submodule update --remote "$SUBMODULE_PATH"
           fi
           new=$(git -C "$SUBMODULE_PATH" rev-parse HEAD)
           echo "old=${old}" >> "$GITHUB_OUTPUT"
@@ -74,6 +78,7 @@ jobs:
         with:
           branch: ${{ inputs.pr-branch }}
           base: ${{ inputs.base-branch }}
+          paths: ${{ inputs.submodule-path }}
           commit-message: "chore: bump ${{ inputs.submodule-path }} to upstream HEAD"
           pr-body: |
             Automated submodule bump of `${{ inputs.submodule-path }}`.
