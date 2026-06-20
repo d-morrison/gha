@@ -58,10 +58,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _ci-quarto-site
-          printf 'project:\n  type: website\n' > _ci-quarto-site/_quarto.yml
+          # _quarto.yml declares a different output-dir than the composite is
+          # given below, so a green build proves the `output-dir` input is
+          # authoritative (forwarded to `quarto render --output-dir`, overriding
+          # _quarto.yml) rather than merely matching it.
+          printf 'project:\n  type: website\n  output-dir: _from_quarto_yml\n' > _ci-quarto-site/_quarto.yml
           printf -- '---\ntitle: Selftest\n---\n\nBuild check for the quarto-publish composite.\n' \
             > _ci-quarto-site/index.qmd
-      - name: Build the fixture site
+      - name: Build the fixture site (non-default output-dir overrides _quarto.yml)
         uses: ./quarto-publish
         with:
           path: _ci-quarto-site
+          output-dir: docs

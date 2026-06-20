@@ -37,7 +37,7 @@ on:
         type: string
         default: ''
       output-dir:
-        description: Where the rendered site is staged from (must match the project's _quarto.yml output-dir; not passed to render). Override only for a non-default output-dir.
+        description: Directory the rendered site is written to and staged from (relative to `path`), forwarded to `quarto render --output-dir` (overrides any `_quarto.yml` setting). Defaults to `_site`.
         type: string
         default: '_site'
       checkout-submodules:
