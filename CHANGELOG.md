@@ -20,6 +20,22 @@ below with migration steps.
   workflow (`quarto-publish.yml`) adds the deploy, optional submodule init, and
   a `pre-render-artifact` input so a caller can inject build-time assets (e.g.
   recorded media) before render. First consumer: `Lacaedemon/sparta` (#37).
+- PR-preview / publish family (#33) — centralizes the three-workflow preview
+  pipeline rme carried inline:
+  - `preview` composite action + `preview.yml` reusable workflow — build half;
+    renders the Quarto site read-only in the (possibly fork) PR context and
+    uploads it + PR metadata as an artifact. Parameterized for non-rme
+    consumers (R version, apt packages, renv on/off, local-package install,
+    Chrome, submodules, render profile). Writes PR metadata **after** checkout
+    so `git clean -ffdx` can't wipe it from the artifact (d-morrison/rme#913),
+    and keeps the `preview:pdf`/`preview:docx`/`preview:revealjs` and
+    `clear freezer` label gates.
+  - `preview-deploy.yml` reusable workflow — deploy half; on `workflow_run`
+    completion publishes the artifact to `gh-pages` in the base-repo context
+    and comments the preview link. Kept split from the build half so untrusted
+    fork code never holds write permissions (the trust boundary).
+  - `cleanup-pr-previews.yml` reusable workflow — scheduled housekeeping that
+    deletes preview directories for closed PRs.
 - `check-phi` — scans pull requests (added lines only; whole tree on `push`)
   for content that looks like PHI: US Social Security numbers, medical record
   numbers, dates of birth, and PHI-suggestive column headers in delimited data
@@ -50,6 +66,16 @@ below with migration steps.
 
 ### Fixed
 
+- **Example caller stubs now pass secrets explicitly instead of `secrets:
+  inherit`.** GitHub only inherits org/repo secrets into a reusable workflow
+  owned by the *same* org/user, so a cross-owner consumer (e.g. a `UCD-SERG`-org
+  repo calling these `d-morrison`-user-owned workflows) inherited an empty
+  `CLAUDE_CODE_OAUTH_TOKEN` and every `@claude` run failed env-validation
+  ("… is required when using direct Anthropic API"). `examples/claude.yml` and
+  `examples/claude-code-review.yml` now pass `CLAUDE_CODE_OAUTH_TOKEN` (and the
+  optional `SUBMODULES_TOKEN` / `WORKFLOW_TOKEN`) explicitly, which resolves
+  caller-side and works regardless of owner. Existing consumers copied from the
+  old stubs must make the same change (#49).
 - `claude-code-review` now sets `allowed_bots: github-actions[bot]`, so the
   review `claude.yml` re-dispatches after an `@claude` run pushes commits can
   actually run. The action's agent mode (used by `workflow_dispatch`) blocks
@@ -61,6 +87,20 @@ below with migration steps.
   gated to `pull_request`, so a dispatched (`workflow_dispatch`) review that
   wins the per-PR concurrency race also folds earlier pushes' review comments as
   OUTDATED instead of leaving them expanded.
+
+### Security
+
+- **All third-party actions are now pinned to full commit SHAs** (with the
+  human-readable version in a trailing comment), following GitHub's
+  [recommended hardening posture](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions).
+  A SHA is immutable, so a re-pointed tag or a compromised upstream can no longer
+  silently change what runs — most important for the `preview-deploy` job, which
+  runs in the base-repo context with `contents: write` + `pull-requests: write`.
+  Added [`.github/dependabot.yml`](.github/dependabot.yml) (`github-actions`
+  ecosystem, weekly, grouped, covering `.github/workflows/` and each composite
+  action) so the pins are auto-bumped as upstreams publish releases instead of
+  freezing. First-party `d-morrison/gha/*@v1` self-references and the
+  `examples/` templates intentionally still track the `@v1` major tag (#48).
 
 ## [v1] — initial pilot set
 

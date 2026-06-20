@@ -49,6 +49,9 @@ Pin to `@v1` (a moving major tag updated as fixes land). Do not reference
 | `claude.yml` | Agent-mode Claude Code bot: responds to `@claude` mentions, edits files, opens/updates PRs | `setup-r`, `install-quarto`, `use-renv`, `apt-packages`, `pip-packages`, `checkout-submodules`, `link-skills`, `eager-pr`, `prompt-addendum`, `webfetch-allowlist-url`, `reviewer` |
 | `claude-code-review.yml` | Read-only Claude PR review (runs the `code-review` plugin; inline findings on `pull_request` runs, consolidated summary on dispatched runs) | `pr-number`, `prompt-addendum`, `checkout-submodules` |
 | `quarto-publish.yml` | Render a Quarto site and deploy it to GitHub Pages | `path`, `setup-r`, `r-packages`, `use-renv`, `tinytex`, `apt-packages`, `output-dir`, `checkout-submodules`, `pre-render-artifact`, `pre-render-artifact-path`, `deploy` |
+| `preview.yml` | Build half of the PR-preview family: render a Quarto site in the (possibly fork) PR context and upload it + PR metadata as an artifact (read-only) | `r-version`, `apt-packages`, `use-renv`, `install-package`, `setup-chrome`, `submodules`, `render-profile` |
+| `preview-deploy.yml` | Deploy half: on `workflow_run` completion of the build, publish the artifact to `gh-pages` and comment the preview link (base-repo context) | — |
+| `cleanup-pr-previews.yml` | Housekeeping: delete `gh-pages` preview directories for PRs that are no longer open | `preview-dir` |
 
 ## Permissions
 
@@ -86,6 +89,11 @@ that need to write must have the **caller** grant it on the calling job:
     submodule contents instead of reporting them as uninitialized. Public
     submodules clone anonymously; private ones additionally need a
     `SUBMODULES_TOKEN` secret.
+- `preview` (build half, read-only) → only `contents: read` (the default).
+- `preview-deploy` (deploy half, pushes `gh-pages` + comments) → grant
+  `contents: write`, `pull-requests: write`, `actions: read`.
+- `cleanup-pr-previews` (commits deletions to `gh-pages`) → grant
+  `contents: write`, `pull-requests: read`.
 
 The stubs in [`examples/`](examples) already include the right `permissions:`
 blocks — copy them as-is.
@@ -118,11 +126,67 @@ exist but are **off by default** (too noisy in source); enable them via the
   (defaults to `.github/phi-allowlist.txt` when present; override with the
   `allowlist-file` input). Use `fail: false` to downgrade to warnings.
 
+## PR previews (`preview` family)
+
+The PR-preview family publishes a rendered Quarto site for each open PR to a
+`pr-preview/pr-<n>/` directory on `gh-pages`. It is **three** cooperating
+workflows — install all three stubs from [`examples/`](examples):
+
+1. **`preview.yml`** (build) — triggered on `pull_request`. Renders the site and
+   uploads it plus the PR metadata as a `pr-preview-site` artifact. Runs
+   **read-only** in the (possibly fork) PR context, so it can't write to the
+   base repo.
+2. **`preview-deploy.yml`** (deploy) — triggered on `workflow_run` completion of
+   the build. Downloads the artifact and publishes it to `gh-pages` in the
+   **base-repo** context (where the token can write), then comments the preview
+   link on the PR.
+3. **`cleanup-pr-previews.yml`** (housekeeping) — scheduled. Removes preview
+   directories for PRs that have closed.
+
+The build/deploy split is a **trust boundary**: untrusted fork code only ever
+runs in the read-only build half, while the privileged `gh-pages` push happens
+in the deploy half against base-repo code. Don't collapse them into one job.
+
+Two wiring requirements:
+
+- The deploy stub's `on: workflow_run: workflows:` value **must match the
+  build stub's `name:`** (both default to `Quarto Preview Build` in the
+  examples). That string is how `workflow_run` finds the build.
+- `workflow_run` and `schedule` triggers only fire for the copy of the file on
+  the **default branch**, so previews and cleanup don't take effect until the
+  stubs are merged to `main`.
+
+The build half is parameterized for non-rme consumers (R version, the apt
+package list, renv on/off, `R CMD INSTALL .` on/off, Chrome, submodules, render
+profile). Label-gated extras are preserved: add `preview:pdf`, `preview:docx`,
+or `preview:revealjs` to a PR to render those formats too, and `clear freezer`
+to bypass the Quarto freeze cache.
+
 ## Versioning
 
 Releases are tagged `vX.Y.Z`; the `vX` major tag moves to the latest compatible
 release. Consumers reference `@v1`. See [`CHANGELOG.md`](CHANGELOG.md) for what
 changes as the `@v1` tag moves and for any breaking-change migration steps.
+
+### Pinning third-party actions
+
+Every **third-party** action is pinned to a full commit SHA, with the
+human-readable version in a trailing comment, e.g.:
+
+```yaml
+uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+```
+
+This is GitHub's [recommended hardening posture](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions):
+a SHA is immutable, so a re-pointed tag or a compromised upstream can't silently
+change what runs — which matters here because jobs like the preview deploy run
+with `contents: write` + `pull-requests: write`. [`.github/dependabot.yml`](.github/dependabot.yml)
+bumps these pins as upstreams publish releases, so they stay current instead of
+freezing. When adding a new third-party action, pin it the same way.
+
+First-party `d-morrison/gha/*@v1` self-references and the [`examples/`](examples/)
+templates intentionally track the `@v1` major tag (so consumers ride the moving
+major), and so are **not** SHA-pinned.
 
 ## Reverse dependencies
 
@@ -138,6 +202,6 @@ automatically. A **private** consumer must allow access to this repo under
 
 ## Scope
 
-This is the pilot set (the byte-identical / near-identical workflow families).
-Additional families (spell check, lint-changed-files, pr-commands, R-CMD-check,
-publish/preview) may be added later.
+This started as the pilot set (the byte-identical / near-identical workflow
+families) plus the PR-preview/publish family. Additional families (spell check,
+lint-changed-files, pr-commands, R-CMD-check) may be added later.

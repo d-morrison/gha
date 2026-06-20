@@ -1,8 +1,10 @@
 # Copy to .github/workflows/claude.yml in your repo.
 # NOTE: requires the CLAUDE_CODE_OAUTH_TOKEN repository secret. The calling job
-# grants write permissions so Claude can push branches and open PRs; `secrets:
-# inherit` passes CLAUDE_CODE_OAUTH_TOKEN (and an optional SUBMODULES_TOKEN)
-# through to the reusable workflow.
+# grants write permissions so Claude can push branches and open PRs. Pass the
+# secrets explicitly (below) rather than via `secrets: inherit`: GitHub only
+# inherits secrets into a reusable workflow owned by the same org/user, so a
+# cross-owner caller (e.g. a UCD-SERG-org repo calling this d-morrison
+# user-owned workflow) inherits an empty token.
 name: Claude Code
 
 on:
@@ -36,7 +38,10 @@ jobs:
       id-token: write
       actions: write       # dispatch the review workflow via `gh workflow run`
     uses: d-morrison/gha/.github/workflows/claude.yml@v1
-    secrets: inherit
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}   # optional; empty when unset
+      WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}       # optional; for editing .github/workflows
     # with:
     #   setup-r: true               # default; set false for non-R repos
     #   install-quarto: true        # for Quarto books
