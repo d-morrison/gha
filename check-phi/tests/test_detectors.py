@@ -1,0 +1,179 @@
+"""Unit tests for the check-phi heuristic detectors.
+
+The detectors are high-precision tripwires that gate PRs for protected health
+information, so they're exactly the kind of regex/heuristic code that silently
+regresses on refactor. These tests pin each detector's positive and negative
+behavior, including the `csv_phi_header` line-1 / suffix edge cases.
+
+check-phi.py isn't an importable module name (the hyphen), so load it by path.
+"""
+
+import importlib.util
+from pathlib import Path
+
+_MOD_PATH = Path(__file__).resolve().parent.parent / "check-phi.py"
+_spec = importlib.util.spec_from_file_location("check_phi", _MOD_PATH)
+assert _spec is not None and _spec.loader is not None, f"Could not load {_MOD_PATH}"
+check_phi = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(check_phi)
+
+
+# ── SSN ──────────────────────────────────────────────────────────────────────
+
+def test_ssn_matches_a_valid_number():
+    hits = check_phi._detect_ssn("f.txt", 1, "patient ssn 123-45-6789 on file")
+    assert len(hits) == 1
+    assert "Social Security" in hits[0][1]
+
+
+def test_ssn_never_echoes_the_value():
+    # Findings must report only the detector message, never the matched digits.
+    hits = check_phi._detect_ssn("f.txt", 1, "123-45-6789")
+    assert hits  # must fire so the no-echo check below is non-vacuous
+    assert all("123-45-6789" not in message for _, message in hits)
+
+
+def test_ssn_reports_a_one_based_column():
+    # col is the 1-based character offset of the match (m.start() + 1).
+    hits = check_phi._detect_ssn("f.txt", 1, "ssn 123-45-6789")
+    assert len(hits) == 1
+    assert hits[0][0] == 5  # "123" begins at index 4
+
+
+def test_ssn_rejects_areas_the_ssa_never_issues():
+    for bad in ("000-12-3456", "666-12-3456", "900-12-3456"):
+        assert check_phi._detect_ssn("f.txt", 1, bad) == []
+
+
+def test_ssn_rejects_zero_group_or_serial():
+    assert check_phi._detect_ssn("f.txt", 1, "123-00-4567") == []
+    assert check_phi._detect_ssn("f.txt", 1, "123-45-0000") == []
+
+
+def test_ssn_ignores_longer_digit_runs():
+    # The (?<!\d) lookbehind and (?!\d) lookahead guards keep it off zip+4 and
+    # longer ID fragments.
+    assert check_phi._detect_ssn("f.txt", 1, "00123-45-67890") == []
+
+
+def test_valid_ssn_helper():
+    assert check_phi._valid_ssn("123", "45", "6789") is True
+    assert check_phi._valid_ssn("000", "45", "6789") is False
+    assert check_phi._valid_ssn("900", "45", "6789") is False
+    assert check_phi._valid_ssn("123", "00", "6789") is False
+    assert check_phi._valid_ssn("123", "45", "0000") is False
+
+
+# ── MRN ──────────────────────────────────────────────────────────────────────
+
+def test_mrn_matches_labeled_numbers():
+    for line in ("MRN: 123456", "medical record number 1234567", "mrn=987654321"):
+        assert len(check_phi._detect_mrn("f.txt", 1, line)) == 1
+
+
+def test_mrn_requires_enough_digits():
+    # 5–12 digits required, so a 4-digit value doesn't trip it.
+    assert check_phi._detect_mrn("f.txt", 1, "mrn: 1234") == []
+
+
+def test_mrn_accepts_the_twelve_digit_upper_bound():
+    # The \d{5,12} bound should still fire at exactly 12 digits.
+    assert len(check_phi._detect_mrn("f.txt", 1, "mrn 123456789012")) == 1
+
+
+def test_mrn_needs_the_label():
+    assert check_phi._detect_mrn("f.txt", 1, "record 123456 archived") == []
+
+
+# ── DOB ──────────────────────────────────────────────────────────────────────
+
+def test_dob_matches_labeled_dates():
+    for line in ("DOB: 01/02/1990", "date of birth 1990-01-02", "birth_date 1/2/90"):
+        assert len(check_phi._detect_dob("f.txt", 1, line)) == 1
+
+
+def test_dob_needs_a_date_after_the_label():
+    assert check_phi._detect_dob("f.txt", 1, "date of birthday party next week") == []
+
+
+# ── CSV header detector (incl. the diff-scope edge case) ─────────────────────
+
+def test_csv_header_flags_phi_column_on_line_one():
+    hits = check_phi._detect_csv_phi_header("data.csv", 1, "ssn,name\n")
+    assert len(hits) == 1
+    assert hits[0][0] == 1  # first column
+
+
+def test_csv_header_reports_later_column_offset():
+    # col is the 1-based character offset of the offending cell, not its index.
+    hits = check_phi._detect_csv_phi_header("data.csv", 1, "id,ssn\n")
+    assert len(hits) == 1
+    assert hits[0][0] == 4  # after "id," → 1 + len("id") + 1
+
+
+def test_csv_header_only_fires_on_line_one():
+    # The reviewer-flagged edge case: in a diff, the header detector keys off the
+    # NEW-file line number, so it must fire only when that number is 1.
+    assert check_phi._detect_csv_phi_header("data.csv", 2, "ssn,name") == []
+
+
+def test_csv_header_only_fires_on_delimited_suffixes():
+    assert check_phi._detect_csv_phi_header("notes.txt", 1, "ssn,name") == []
+
+
+def test_csv_header_uses_the_right_delimiter_per_suffix():
+    # .tsv splits on tab; the normalized token drops spaces/underscores.
+    assert len(check_phi._detect_csv_phi_header("d.tsv", 1, "patient id\tvalue")) == 1
+    assert len(check_phi._detect_csv_phi_header("d.psv", 1, "value|date_of_birth")) == 1
+
+
+def test_csv_header_ignores_non_phi_columns():
+    assert check_phi._detect_csv_phi_header("data.csv", 1, "id,value,count") == []
+
+
+# ── Off-by-default line detectors ────────────────────────────────────────────
+
+def test_phone_needs_separators():
+    assert len(check_phi._detect_phone("f.txt", 1, "call 555-123-4567")) == 1
+    assert len(check_phi._detect_phone("f.txt", 1, "(555) 123-4567")) == 1
+    # A bare 10-digit run is treated as an arbitrary ID, not a phone number.
+    assert check_phi._detect_phone("f.txt", 1, "id 5551234567 here") == []
+
+
+def test_email_detector():
+    assert len(check_phi._detect_email("f.txt", 1, "contact a.b+c@example.com")) == 1
+    assert check_phi._detect_email("f.txt", 1, "no address here") == []
+
+
+# ── Path-ignore glob translation ─────────────────────────────────────────────
+
+def test_bare_dir_ignore_is_recursive():
+    ignores = check_phi._compile_ignores(["docs"])
+    assert check_phi._ignored("docs/sub/data.csv", ignores) is True
+    assert check_phi._ignored("docs", ignores) is True
+
+
+def test_wildcard_ignore_stays_single_segment():
+    ignores = check_phi._compile_ignores(["tests/*"])
+    assert check_phi._ignored("tests/a.csv", ignores) is True
+    assert check_phi._ignored("tests/sub/a.csv", ignores) is False
+
+
+def test_double_star_ignore_is_recursive():
+    ignores = check_phi._compile_ignores(["**/*.csv"])
+    assert check_phi._ignored("any/depth/data.csv", ignores) is True
+    assert check_phi._ignored("data.csv", ignores) is True
+
+
+# ── Misc helpers ─────────────────────────────────────────────────────────────
+
+def test_split_list_handles_commas_and_newlines():
+    assert check_phi._split_list("ssn, mrn\n dob ") == ["ssn", "mrn", "dob"]
+    assert check_phi._split_list("") == []
+
+
+def test_inline_pragma_matches_phi_allow_but_not_allowlist():
+    # A `phi-allow` token on a line suppresses it; the word boundary keeps the
+    # pragma from also firing on "phi-allowlist" (e.g. a path mention).
+    assert check_phi.INLINE_PRAGMA_RE.search("ssn 123-45-6789  # phi-allow")
+    assert not check_phi.INLINE_PRAGMA_RE.search("see .github/phi-allowlist.txt")
