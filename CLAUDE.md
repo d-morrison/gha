@@ -18,7 +18,8 @@ composite action plus a `workflow_call` reusable workflow. Consumers pin to `@v1
   is the shared push-and-open-PR helper used by `bump-submodule` and
   `sync-shared-fragments`).
 - `.github/workflows/` — the `workflow_call` reusable workflows that wrap the
-  composites (one per capability), plus the `claude.yml` and
+  composites (one per consumer-facing capability — the shared internal
+  `open-sync-pr` composite has no wrapper), plus the `claude.yml` and
   `claude-code-review.yml` reusable wrappers, and `_selftest.yml`, which
   exercises composites on every PR — local `./` refs for pre-release
   capabilities, and `@v1` through the reusable-workflow wrappers for stable ones.
