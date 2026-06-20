@@ -31,6 +31,15 @@ on:
           SUBMODULES_TOKEN secret; public submodules clone anonymously without it.
         type: boolean
         default: false
+      allowed-bots:
+        description: >-
+          Comma-separated bot actors the reviewer accepts (passed to
+          claude-code-action's allowed_bots). Defaults to github-actions[bot] so
+          claude.yml's re-dispatched reviews — which run as that actor — aren't
+          rejected as "non-human". Set e.g. "github-actions[bot],claude" for
+          repos whose bot-authored pushes should also be reviewable.
+        type: string
+        default: 'github-actions[bot]'
     secrets:
       # `required: false` so callers don't hard-fail at the call gate on
       # fork `pull_request` events, where secrets are unavailable: GitHub
@@ -81,6 +90,34 @@ jobs:
       id-token: write
 
     steps:
+      # A PR that changes the review workflow file itself can't be reviewed by
+      # the action: its App-token exchange requires the workflow to match the
+      # default branch, so it 401s ("Workflow validation failed … must have
+      # identical content to the … default branch") until merged — the action
+      # says this is normal and to ignore it. Rather than post a failing check,
+      # detect that case and skip the review; it runs normally once merged. The
+      # file checked is the CALLER's review workflow, derived from
+      # github.workflow_ref (owner/repo/.github/workflows/<file>@ref ->
+      # .github/workflows/<file>), so it works whatever stub name the consumer
+      # uses. (Ported from qwt; keyed off github.workflow_ref — gha #45.)
+      - name: Skip self-review when the PR edits this workflow
+        id: selfmod
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+          WF_PATH=$(printf '%s' "$WORKFLOW_REF" | sed -E 's#^[^/]+/[^/]+/(\.github/workflows/[^@]+)@.*#\1#')
+          files=$(gh api "repos/$REPO/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename' 2>/dev/null || true)
+          if printf '%s\n' "$files" | grep -qxF "$WF_PATH"; then
+            echo "self_mod=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::PR #$PR_NUMBER edits $WF_PATH — skipping self-review (the action 401s on workflow validation until merged; it runs after merge)."
+          else
+            echo "self_mod=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -103,6 +140,7 @@ jobs:
       # starting their own. Also snapshot the PR head SHA for the post-step.
       - name: Stash and clear reviewers; record starting head SHA
         id: stash
+        if: steps.selfmod.outputs.self_mod != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -127,6 +165,7 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
+        if: steps.selfmod.outputs.self_mod != 'true'
         uses: anthropics/claude-code-action@51705da45eecce209d4700538bf8377d5b5fc695 # v1.0.152
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -210,19 +249,20 @@ jobs:
           # activity; the collapse step below folds priors up as OUTDATED.
           use_sticky_comment: 'false'
           display_report: 'true'
-          # Permit the github-actions bot to initiate this run. claude.yml
-          # re-dispatches a review after an @claude run pushes commits, and
-          # `gh workflow run` there runs as github-actions[bot]. But the
-          # action's AGENT mode — which workflow_dispatch uses (track_progress
-          # is 'false' above for dispatched runs) — blocks bot actors by
-          # default, failing with "Workflow initiated by non-human actor:
-          # github-actions". Without this, every re-dispatched review dies
-          # before it can post. Scoped to the one bot that legitimately
-          # dispatches us: the `if:` gate already filters bot actors out of the
-          # automatic pull_request path, so this only widens the dispatch path,
-          # which is itself reachable only via claude.yml's trusted-author gate
-          # (or a manual dispatch, which needs write access).
-          allowed_bots: 'github-actions[bot]'
+          # Permit bot actors to initiate this run (default github-actions[bot],
+          # overridable via the allowed-bots input). claude.yml re-dispatches a
+          # review after an @claude run pushes commits, and `gh workflow run`
+          # there runs as github-actions[bot]. But the action's AGENT mode —
+          # which workflow_dispatch uses (track_progress is 'false' above for
+          # dispatched runs) — blocks bot actors by default, failing with
+          # "Workflow initiated by non-human actor: github-actions". Without
+          # this, every re-dispatched review dies before it can post. Scoped to
+          # the bot(s) that legitimately dispatch us: the `if:` gate already
+          # filters bot actors out of the automatic pull_request path, so this
+          # only widens the dispatch path, which is itself reachable only via
+          # claude.yml's trusted-author gate (or a manual dispatch, which needs
+          # write access).
+          allowed_bots: ${{ inputs.allowed-bots }}
 
       # With sticky disabled, every run leaves its own review comment. Collapse
       # the older ones (minimize as OUTDATED) so the PR shows one expanded,
