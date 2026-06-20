@@ -11,7 +11,10 @@ on:
   workflow_call:
     inputs:
       source-repo:
-        description: Upstream repository in owner/name form (e.g. UCD-SERG/lab-manual).
+        description: >-
+          Upstream repository in owner/name form (e.g. UCD-SERG/lab-manual). A
+          private source repo needs a SOURCE_TOKEN secret with read access; the
+          default GITHUB_TOKEN can only read the repo running the workflow.
         type: string
         required: true
       source-ref:
@@ -47,6 +50,8 @@ on:
         type: string
         default: automated/sync-shared-fragments
     secrets:
+      SOURCE_TOKEN:
+        required: false
       WORKFLOW_TOKEN:
         required: false
 
@@ -67,7 +72,7 @@ jobs:
       - name: Vendor upstream fragments
         id: fetch
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.SOURCE_TOKEN || github.token }}
           SOURCE_REPO: ${{ inputs.source-repo }}
           SOURCE_REF: ${{ inputs.source-ref }}
           SOURCE_PATHS: ${{ inputs.source-paths }}

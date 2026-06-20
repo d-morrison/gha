@@ -25,6 +25,8 @@ jobs:
       dest-dir: shared/vendored
       manifest-path: shared/vendored/MANIFEST.json
     secrets:
+      # Needed only if source-repo is private; omit for public upstreams.
+      SOURCE_TOKEN: ${{ secrets.SOURCE_TOKEN }}
       # Set only if the bot must push to a protected branch; otherwise omit and
       # the push falls back to GITHUB_TOKEN.
       WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}

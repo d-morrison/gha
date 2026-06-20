@@ -62,6 +62,10 @@ runs:
         # Stage only the caller's output paths, so unrelated working-tree changes
         # aren't swept into the PR.
         read -ra add_paths <<< "$PATHS"
+        if [ "${#add_paths[@]}" -eq 0 ]; then
+          echo "::error::The 'paths' input is empty; refusing to stage the entire working tree."
+          exit 1
+        fi
         git add -A -- "${add_paths[@]}"
         if git diff --cached --quiet; then
           echo "::notice::No changes to sync; nothing to do."
