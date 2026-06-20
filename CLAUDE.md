@@ -8,6 +8,36 @@ Central, reusable GitHub Actions for `d-morrison` / `UCD-SERG` / `ucdavis` R-pac
 and Quarto repositories (see [`README.md`](README.md)). Each capability ships as a
 composite action plus a `workflow_call` reusable workflow. Consumers pin to `@v1`.
 
+### Layout
+
+- Per-capability composite-action directories at the repo root, each holding an
+  `action.yml` plus its helper script — e.g. `check-bibliography-dois/` (R),
+  `check-non-standard-chars/` and `check-phi/` (Python), `check-links/` (bundled
+  `lychee.default.toml`), and `preview/`, `quarto-publish/`, `open-sync-pr/`
+  (the last is the shared push-and-open-PR helper used by `bump-submodule` and
+  `sync-shared-fragments`).
+- `.github/workflows/` — the `workflow_call` reusable workflows that wrap the
+  composites (one per capability, plus `claude*` variants), and `_selftest.yml`,
+  which exercises the local composites on every PR.
+- `.github/actions/checkout-submodules/` — a small shared composite reused by the
+  reusable workflows.
+- `examples/` — caller stubs consumers copy into their own repos.
+- `README.md`, `CHANGELOG.md`, `REVDEPS.md` (registered downstream consumers).
+
+When editing a capability, change the composite (`<name>/action.yml` + script)
+and keep the wrapping reusable workflow and its `examples/<name>.yml` stub in
+sync. New `.github/workflows/` changes are exercised by `_selftest.yml`; because
+brand-new actions aren't at the `@v1` tag yet, the selftest runs them via the
+local `./<name>` ref until release.
+
+### Tests
+
+`check-phi/tests/test_detectors.py` is a pytest suite pinning each PHI detector's
+positive and negative behavior. Run it with `python3 -m pytest check-phi/tests/ -q`;
+CI runs it as the `phi-tests` job in `_selftest.yml`. There's no broader unit-test
+harness — most capabilities are validated end-to-end by `_selftest.yml` running
+the composite against a fixture.
+
 ## GitHub access in remote / web sessions
 
 Claude Code on the web (and other remote/CI sessions) runs in a sandbox where the
