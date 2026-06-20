@@ -158,14 +158,9 @@ on:
         required: false
       SUBMODULES_TOKEN:
         required: false
-      # Token used for the git pushes (branches / commits). The integrated
-      # GITHUB_TOKEN cannot push commits that create or update files under
-      # `.github/workflows/` — GitHub rejects that without the `workflows`
-      # scope, which GITHUB_TOKEN never has. Set this to a PAT or GitHub App
-      # token with `contents:write` + `workflows:write` in repos where Claude
-      # edits workflow files (e.g. this repo dogfooding itself). When unset,
-      # pushes fall back to GITHUB_TOKEN, which is fine for repos that never
-      # touch `.github/workflows/`.
+      # PAT/App token with `contents:write` + `workflows:write`, needed only to
+      # push changes under `.github/workflows/` (GITHUB_TOKEN lacks the
+      # `workflows` scope). Falls back to GITHUB_TOKEN when unset. See README.
       WORKFLOW_TOKEN:
         required: false
 
