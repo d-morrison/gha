@@ -135,7 +135,7 @@ jobs:
       # SUBMODULES_TOKEN insteadOf rewrite and the anonymous fallback; see
       # .github/actions/checkout-submodules.
       - name: Checkout submodules
-        if: inputs.checkout-submodules
+        if: steps.selfmod.outputs.self_mod != 'true' && inputs.checkout-submodules
         uses: d-morrison/gha/.github/actions/checkout-submodules@v1
         with:
           submodules-token: ${{ secrets.SUBMODULES_TOKEN }}
