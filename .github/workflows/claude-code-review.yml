@@ -169,6 +169,17 @@ jobs:
           prompt: |
             /code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number || inputs.pr-number }}
 
+            **Watch for AI hallucinations.** This diff may be partly
+            machine-authored, so scrutinize it for confident-but-fabricated
+            content: calls to functions, methods, arguments, packages, or APIs
+            that don't exist; references, citations, DOIs, or URLs that are
+            invented or don't resolve; file paths, config keys, or constants
+            that look plausible but aren't real; and comments or documentation
+            that describe behavior the code doesn't actually implement. Verify
+            questionable symbols against the codebase and its dependencies rather
+            than assuming they exist, and flag anything you can't confirm as a
+            possible hallucination.
+
             **Post line-specific findings as inline review comments** anchored
             to the relevant line(s) — use the inline-comment tool, not a prose
             list in the summary. Reserve the top-level summary comment for a

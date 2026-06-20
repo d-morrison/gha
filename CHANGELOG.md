@@ -63,6 +63,11 @@ below with migration steps.
 - `check-bibliography-dois` now collects `.bib` files NUL-delimited into a bash
   array, so bibliography paths containing spaces are passed to the checker as
   intact single arguments instead of word-splitting (#30).
+- `claude-code-review`'s prompt now instructs the reviewer to watch for AI
+  hallucinations — fabricated functions/arguments/APIs, invented references,
+  DOIs, or URLs, plausible-but-unreal file paths and constants, and comments
+  that describe behavior the code doesn't implement — and to verify questionable
+  symbols against the codebase rather than assuming they exist.
 
 ### Fixed
 
