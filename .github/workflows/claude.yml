@@ -161,7 +161,7 @@ on:
       # PAT/App token with `contents:write` + `workflows:write`, needed only to
       # push changes under `.github/workflows/` (GITHUB_TOKEN lacks the
       # `workflows` scope). Falls back to GITHUB_TOKEN when unset. See README →
-      # Setup.
+      # Permissions.
       WORKFLOW_TOKEN:
         required: false
 
