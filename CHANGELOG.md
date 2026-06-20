@@ -88,6 +88,20 @@ below with migration steps.
   wins the per-PR concurrency race also folds earlier pushes' review comments as
   OUTDATED instead of leaving them expanded.
 
+### Security
+
+- **All third-party actions are now pinned to full commit SHAs** (with the
+  human-readable version in a trailing comment), following GitHub's
+  [recommended hardening posture](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions).
+  A SHA is immutable, so a re-pointed tag or a compromised upstream can no longer
+  silently change what runs — most important for the `preview-deploy` job, which
+  runs in the base-repo context with `contents: write` + `pull-requests: write`.
+  Added [`.github/dependabot.yml`](.github/dependabot.yml) (`github-actions`
+  ecosystem, weekly, grouped, covering `.github/workflows/` and each composite
+  action) so the pins are auto-bumped as upstreams publish releases instead of
+  freezing. First-party `d-morrison/gha/*@v1` self-references and the
+  `examples/` templates intentionally still track the `@v1` major tag (#48).
+
 ## [v1] — initial pilot set
 
 Reusable workflows + composite actions:

@@ -214,7 +214,7 @@ jobs:
             --body ":eyes: Picked up by [workflow run #${{ github.run_id }}]($RUN_URL). Setup runs first; Claude itself responds after that."
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 1
           submodules: false
@@ -250,24 +250,24 @@ jobs:
 
       - name: Set up pandoc
         if: inputs.setup-r
-        uses: r-lib/actions/setup-pandoc@v2
+        uses: r-lib/actions/setup-pandoc@a51a8012b0aab7c32ef9d19bf54da93f3254335e # v2.12.0
 
       - name: Set up R
         if: inputs.setup-r
-        uses: r-lib/actions/setup-r@v2
+        uses: r-lib/actions/setup-r@a51a8012b0aab7c32ef9d19bf54da93f3254335e # v2.12.0
         with:
           use-public-rspm: true
 
       - name: Set up Quarto
         if: inputs.install-quarto
-        uses: quarto-dev/quarto-actions/setup@v2
+        uses: quarto-dev/quarto-actions/setup@8a96df13519ee81fd526f2dfca5962811136661b # v2.2.0
         with:
           tinytex: true
 
       # renv flavor (Quarto books / projects pinned with renv) ...
       - name: Restore renv
         if: inputs.setup-r && inputs.use-renv
-        uses: r-lib/actions/setup-renv@v2
+        uses: r-lib/actions/setup-renv@a51a8012b0aab7c32ef9d19bf54da93f3254335e # v2.12.0
         env:
           # Without GITHUB_PAT, renv can't reach the GitHub API to resolve
           # GitHub-sourced packages (e.g. ddsjoberg/gtsummary) and
@@ -282,7 +282,7 @@ jobs:
       # checklist.
       - name: Install R dependencies
         if: inputs.setup-r && !inputs.use-renv
-        uses: r-lib/actions/setup-r-dependencies@v2
+        uses: r-lib/actions/setup-r-dependencies@a51a8012b0aab7c32ef9d19bf54da93f3254335e # v2.12.0
         with:
           extra-packages: ${{ inputs.r-extra-packages }}
           needs: check
@@ -445,7 +445,7 @@ jobs:
 
       - name: Run Claude Code
         id: claude
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@51705da45eecce209d4700538bf8377d5b5fc695 # v1.0.152
         # GH_TOKEN authenticates the `gh` commands granted in claude-args
         # (gh pr view/diff/edit, gh issue view, gh api); without it `gh`
         # prompts and fails in CI.
