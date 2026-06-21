@@ -35,7 +35,7 @@ composite action plus a `workflow_call` reusable workflow. Consumers pin to `@v1
 - `.github/actions/checkout-submodules/` — a small shared composite reused by the
   reusable workflows.
 - `examples/` — caller stubs consumers copy into their own repos.
-- `README.md`, `CHANGELOG.md`; `REVDEPS.md` — lists registered downstream consumer repos.
+- `README.md`, `CHANGELOG.md` — top-level project docs; `REVDEPS.md` — lists registered downstream consumer repos.
 
 When editing a consumer-facing capability, change the composite (`<name>/action.yml`,
 plus its helper script if one exists) and keep the wrapping reusable workflow and its
