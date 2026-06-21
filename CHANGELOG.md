@@ -80,6 +80,22 @@ below with migration steps.
   DOIs, or URLs, plausible-but-unreal file paths and constants, and comments
   that describe behavior the code doesn't implement — and to verify questionable
   symbols against the codebase rather than assuming they exist (#56).
+- `claude` now reproduces qwt's late-comment dedup so a follow-up `@claude`
+  comment absorbed by a still-running session isn't double-handled by the
+  duplicate run it also queued: a "Skip if this comment was already handled"
+  pre-step bows out when the triggering comment already carries a github-actions
+  🚀 marker, the agent emits a `<!-- claude-absorbed: … -->` marker listing the
+  comments it absorbed by polling, and a post-step reacts 🚀 to each so their own
+  queued runs short-circuit. A companion step re-dispatches a review for a late
+  `@claude review` that a deduped run would otherwise have dropped. Additive —
+  no consumer input changes (#44, ported from qwt #73/#90/#95).
+- `claude-code-review` gained an `allowed-bots` input (default
+  `github-actions[bot]`, previously hard-coded) so a consumer can widen the
+  accepted dispatch actors (e.g. `github-actions[bot],claude`), and a
+  "Skip self-review when the PR edits this workflow" step that detects (via
+  `github.workflow_ref`) a PR modifying the caller's review workflow and skips
+  the review — which would otherwise 401 on the action's workflow-validation
+  until merged — instead of posting a failed check (#45, ported from qwt).
 
 ### Fixed
 

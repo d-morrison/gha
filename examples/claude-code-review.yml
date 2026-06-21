@@ -36,5 +36,6 @@ jobs:
       pr-number: ${{ inputs.pr_number }}
     # with:
     #   checkout-submodules: true   # SUBMODULES_TOKEN secret only for private submodules
+    #   allowed-bots: 'github-actions[bot],claude'   # accept more bot actors (default: github-actions[bot])
     #   prompt-addendum: |
     #     Repo-specific review guidance (e.g. Quarto/R conventions to enforce).
