@@ -40,9 +40,9 @@ composite action plus a `workflow_call` reusable workflow. Consumers pin to `@v1
 When editing a consumer-facing capability, change the composite (`<name>/action.yml`,
 plus its helper script if one exists) and keep the wrapping reusable workflow and its
 `examples/<name>.yml` stub in sync. Internal-only composites (like `open-sync-pr`)
-have no wrapper or example stub to update. New `.github/workflows/` changes are exercised by `_selftest.yml`; because
-brand-new actions aren't at the `@v1` tag yet, the selftest runs them via the
-local `./<name>` ref until release.
+have no wrapper or example stub to update. New `.github/workflows/` changes are
+exercised by `_selftest.yml`; because brand-new actions aren't at the `@v1` tag
+yet, the selftest runs them via the local `./<name>` ref until release.
 
 ### Tests
 
