@@ -30,16 +30,16 @@ composite action plus a `workflow_call` reusable workflow. Consumers pin to `@v1
   `workflow_call` reusable workflows that wrap external actions;
   `bump-submodule.yml` and `sync-shared-fragments.yml` are `workflow_call`
   reusable workflows that call the shared internal `open-sync-pr` composite;
-  `slide-major-tag.yml` is push-triggered and runs only in this repo.
+  `slide-major-tag.yml` is push- and dispatch-triggered and runs only in this repo.
 - `.github/actions/checkout-submodules/` — a small shared composite reused by the
   reusable workflows.
 - `examples/` — caller stubs consumers copy into their own repos.
 - `README.md`, `CHANGELOG.md`, `REVDEPS.md` (registered downstream consumers).
 
-When editing a capability, change the composite (`<name>/action.yml`, plus its
-helper script if one exists) and keep the wrapping reusable workflow and its
-`examples/<name>.yml` stub in
-sync. New `.github/workflows/` changes are exercised by `_selftest.yml`; because
+When editing a consumer-facing capability, change the composite (`<name>/action.yml`,
+plus its helper script if one exists) and keep the wrapping reusable workflow and its
+`examples/<name>.yml` stub in sync. Internal-only composites (like `open-sync-pr`)
+have no wrapper or example stub to update. New `.github/workflows/` changes are exercised by `_selftest.yml`; because
 brand-new actions aren't at the `@v1` tag yet, the selftest runs them via the
 local `./<name>` ref until release.
 
