@@ -49,8 +49,9 @@ local `./<name>` ref until release.
 `check-phi/tests/test_detectors.py` is a pytest suite pinning each PHI detector's
 positive and negative behavior. Run it with `python3 -m pytest check-phi/tests/ -q`;
 CI runs it as the `phi-tests` job in `_selftest.yml`. There's no broader unit-test
-harness — most capabilities are validated end-to-end by `_selftest.yml` against
-a fixture (stable capabilities at `@v1`, pre-release ones from local source).
+harness — most capabilities are validated end-to-end by `_selftest.yml`, running
+against this repo itself or small throwaway fixtures (stable capabilities via
+`@v1`, pre-release ones from local source).
 
 ## GitHub access in remote / web sessions
 
