@@ -48,6 +48,20 @@ each comment, then submit once at the end. Watch and respond to PR activity with
 `mcp__github__subscribe_pr_activity` / `mcp__github__unsubscribe_pr_activity` (not
 `gh pr checks --watch`).
 
+### Reading repos outside the session's MCP scope
+
+A task often needs files from a *sibling* repo (e.g. `d-morrison/qwt`) that the
+session's GitHub MCP tools aren't scoped to — those calls fail with
+`Access denied: repository … is not configured for this session`. **Don't report
+the repo as inaccessible from that alone.** First try the raw HTTP URL directly:
+any **public** repo's files are fetchable with `curl` (or `WebFetch`) at
+`https://raw.githubusercontent.com/<owner>/<repo>/<branch>/<path>`, which works
+even when `gh` and the MCP tools don't. (This is how qwt's standalone workflows
+were obtained to port them faithfully into the reusable workflows for #44/#45.)
+Only fall back to "can't access it" — or to whatever session tooling can add a
+repo to scope, if any — after the raw fetch also fails (private repo, or the
+network policy blocks the host).
+
 ## Code review guidelines
 
 When reviewing a pull request (e.g. via `/review`, `/code-review`, or as a Claude
