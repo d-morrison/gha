@@ -206,7 +206,7 @@ Every **third-party** action is pinned to a full commit SHA, with the
 human-readable version in a trailing comment, e.g.:
 
 ```yaml
-uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 ```
 
 This is GitHub's [recommended hardening posture](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions#using-third-party-actions):
