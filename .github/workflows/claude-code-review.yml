@@ -284,7 +284,10 @@ jobs:
           EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
         run: |
           set -euo pipefail
-          EXECUTION_FILE="${EXECUTION_FILE:-/home/runner/work/_temp/claude-execution-output.json}"
+          if [[ -z "$EXECUTION_FILE" ]]; then
+            EXECUTION_FILE="/home/runner/work/_temp/claude-execution-output.json"
+            echo "::warning::execution_file output not set; falling back to $EXECUTION_FILE"
+          fi
           if [[ ! -f "$EXECUTION_FILE" ]]; then
             echo "::error::Claude review produced no execution output — treating as a failed review."
             exit 1
