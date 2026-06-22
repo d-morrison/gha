@@ -271,13 +271,18 @@ jobs:
           allowed_bots: ${{ inputs.allowed-bots }}
 
       - name: Fail the check if the review did not complete
-        if: always() && steps.selfmod.outputs.self_mod != 'true'
+        if: always() && steps.selfmod.outputs.self_mod != 'true' && steps.claude-review.outcome != 'skipped'
         shell: bash
         env:
           EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
         run: |
           set -euo pipefail
+          # Fall back to the well-known temp path when the action's output isn't set
+          # (older action versions or a crash before the output is written).
           if [[ -z "${EXECUTION_FILE:-}" || ! -f "$EXECUTION_FILE" ]]; then
+            EXECUTION_FILE="/home/runner/work/_temp/claude-execution-output.json"
+          fi
+          if [[ ! -f "$EXECUTION_FILE" ]]; then
             echo "::error::Claude review produced no execution output — treating as a failed review."
             exit 1
           fi
