@@ -323,7 +323,7 @@ jobs:
       # not. Post the review manually here so dispatched reviews are visible on
       # the PR instead of silently discarded. Closes #87.
       - name: Post review comment for dispatched run
-        if: |
+        if: >-
           steps.claude-review.outcome == 'success' &&
           github.event_name == 'workflow_dispatch' &&
           inputs.pr-number != ''
@@ -338,7 +338,7 @@ jobs:
             EXECUTION_FILE="${RUNNER_TEMP:-/home/runner/work/_temp}/claude-execution-output.json"
           fi
           # Extract the last assistant text block — Claude's final review output.
-          REVIEW=$(jq -r '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text] | last // ""' "$EXECUTION_FILE" 2>/dev/null || true)
+          REVIEW=$(jq -rs 'flatten | [.[] | select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text] | last // ""' "$EXECUTION_FILE" 2>/dev/null || true)
           if [[ -z "$REVIEW" ]]; then
             echo "No review text found in execution output; skipping comment."
             exit 0
@@ -350,7 +350,7 @@ jobs:
 ---
 
 $REVIEW"
-          gh issue comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
 
       # With sticky disabled, every run leaves its own review comment. Collapse
       # the older ones (minimize as OUTDATED) so the PR shows one expanded,
