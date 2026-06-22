@@ -21,6 +21,10 @@ jobs:
       issues: write
       id-token: write
     uses: d-morrison/gha/.github/workflows/claude-code-review.yml@v1
-    secrets: inherit
+    # Pass secrets explicitly (not `secrets: inherit`) for parity with
+    # examples/claude-code-review.yml; inherit only works for same-owner callers.
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}   # optional; empty when unset
     with:
       pr-number: ${{ inputs.pr_number }}

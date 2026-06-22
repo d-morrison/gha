@@ -270,6 +270,43 @@ jobs:
           # write access).
           allowed_bots: ${{ inputs.allowed-bots }}
 
+      # Guard: fail the check when the Claude run ended with is_error:true.
+      # The action exits 0 even in that case (the result object's subtype is
+      # "success" but is_error is true), so without this step a silently-failed
+      # review looks green. Runs only when claude-review exited 0 (outcome ==
+      # 'success'); if the action step itself failed, the job is already red.
+      # Falls back to the well-known temp path when the action doesn't expose
+      # the execution_file output on the pinned version.
+      - name: Fail the check if the review did not complete
+        if: steps.claude-review.outcome == 'success'
+        shell: bash
+        env:
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$EXECUTION_FILE" ]]; then
+            EXECUTION_FILE="${RUNNER_TEMP:-/home/runner/work/_temp}/claude-execution-output.json"
+            echo "::warning::execution_file output not set; falling back to $EXECUTION_FILE"
+          fi
+          if [[ ! -f "$EXECUTION_FILE" ]]; then
+            echo "::error::Claude review produced no execution output — treating as a failed review."
+            exit 1
+          fi
+          # Handles NDJSON stream or a single JSON array; grabs the last result object.
+          result="$(jq -s 'flatten | map(select(.type=="result")) | last // empty' "$EXECUTION_FILE")"
+          if [[ -z "$result" || "$result" == "null" ]]; then
+            echo "::error::No result object in execution output — review did not finish."
+            exit 1
+          fi
+          is_error="$(jq -r '.is_error // false' <<< "$result")"
+          subtype="$(jq -r '.subtype // ""' <<< "$result")"
+          if [[ "$is_error" == "true" || "$subtype" == error_* ]]; then
+            echo "::error::Claude review ended in an error state (is_error=$is_error, subtype=$subtype)."
+            jq '{subtype, is_error, num_turns, duration_ms, permission_denials_count}' <<< "$result" || true
+            exit 1
+          fi
+          echo "Claude review completed cleanly (subtype=$subtype)."
+
       # With sticky disabled, every run leaves its own review comment. Collapse
       # the older ones (minimize as OUTDATED) so the PR shows one expanded,
       # current review with history folded beneath it. Only THIS workflow's

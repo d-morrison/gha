@@ -68,7 +68,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --quiet pytest
+          # Pin pytest for reproducible runs (bump deliberately, not implicitly).
+          python3 -m pip install --quiet pytest==9.1.1
           python3 -m pytest check-phi/tests/ -q
   # quarto-publish is brand new, so (like check-phi above) it isn't at the
   # released `@v1` tag the reusable workflow pins yet. Exercise the local
