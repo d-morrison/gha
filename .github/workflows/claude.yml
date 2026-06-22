@@ -224,6 +224,11 @@ jobs:
       # reaction, so a user can't suppress a run by hand-reacting 🚀. On any API
       # error we default to NOT skipping (fail open): a wrongful skip would drop
       # the request, the exact failure these guards exist to prevent.
+      #
+      # The whole dedup/absorb/react chain is best-effort: if the active session
+      # never emits the `<!-- claude-absorbed: ... -->` marker, no 🚀 is posted
+      # and this duplicate run proceeds normally, re-handling the comment —
+      # exactly the pre-dedup behavior. An accepted degradation, not a bug.
       - name: Skip if this comment was already handled by an active run
         id: dedup
         # Fail open: a shell-level error here must not fail the job (that would
@@ -849,6 +854,10 @@ jobs:
         run: |
           # `|| late=0` keeps the default `-e` from aborting on a transient gh
           # api error, degrading to "no late review found" rather than failing.
+          # Bot activity is filtered here via the API `user.type` field; the dedup
+          # check and the polling prompt instead match bot *logins*
+          # (github-actions[bot] / claude[bot]) — two idioms, one "ignore
+          # bot-authored activity" intent.
           late=$(
             { gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate --jq '.[]' 2>/dev/null
               gh api "repos/$REPO/pulls/$PR_NUMBER/comments"  --paginate --jq '.[]' 2>/dev/null
