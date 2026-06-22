@@ -285,7 +285,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$EXECUTION_FILE" ]]; then
-            EXECUTION_FILE="${RUNNER_TEMP}/claude-execution-output.json"
+            EXECUTION_FILE="${RUNNER_TEMP:-/home/runner/work/_temp}/claude-execution-output.json"
             echo "::warning::execution_file output not set; falling back to $EXECUTION_FILE"
           fi
           if [[ ! -f "$EXECUTION_FILE" ]]; then
