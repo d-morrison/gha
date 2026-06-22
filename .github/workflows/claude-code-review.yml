@@ -307,6 +307,41 @@ jobs:
           fi
           echo "Claude review completed cleanly (subtype=$subtype)."
 
+      # In agent mode (workflow_dispatch), display_report writes Claude's output
+      # to the GitHub Actions step summary — not to the PR. Tag mode
+      # (pull_request) creates a tracking comment automatically; agent mode does
+      # not. Post the review manually here so dispatched reviews are visible on
+      # the PR instead of silently discarded. Closes #87.
+      - name: Post review comment for dispatched run
+        if: |
+          steps.claude-review.outcome == 'success' &&
+          github.event_name == 'workflow_dispatch' &&
+          inputs.pr-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+        run: |
+          if [[ -z "$EXECUTION_FILE" || ! -f "$EXECUTION_FILE" ]]; then
+            EXECUTION_FILE="${RUNNER_TEMP:-/home/runner/work/_temp}/claude-execution-output.json"
+          fi
+          # Extract the last assistant text block — Claude's final review output.
+          REVIEW=$(jq -r '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text] | last // ""' "$EXECUTION_FILE" 2>/dev/null || true)
+          if [[ -z "$REVIEW" ]]; then
+            echo "No review text found in execution output; skipping comment."
+            exit 0
+          fi
+          # Include the run URL so the collapse step can match this comment by
+          # run ID (same regex: `actions/runs/<id>` in the body).
+          BODY="**Claude finished review** — [View run]($RUN_URL)
+
+---
+
+$REVIEW"
+          gh issue comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
+
       # With sticky disabled, every run leaves its own review comment. Collapse
       # the older ones (minimize as OUTDATED) so the PR shows one expanded,
       # current review with history folded beneath it. Only THIS workflow's
@@ -319,9 +354,9 @@ jobs:
       # pushes' review comments too, or they linger now that dispatched runs can
       # succeed (allowed_bots, above). The run_id→path match already scopes this
       # to this workflow's comments, so running it on dispatched reviews is safe.
-      # (Whether a dispatched run's OWN summary comment is later foldable depends
-      # on it carrying an `actions/runs/<id>` link; if agent mode omits that, the
-      # comment simply isn't matched — a smaller residual than folding nothing.)
+      # The "Post review comment for dispatched run" step above ensures that
+      # dispatched runs always leave a comment with an `actions/runs/<id>` link,
+      # so this collapse step can match and fold it in future rounds.
       - name: Collapse previous Claude review comments
         if: steps.claude-review.outcome == 'success'
         env:
