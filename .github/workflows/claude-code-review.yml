@@ -270,6 +270,31 @@ jobs:
           # write access).
           allowed_bots: ${{ inputs.allowed-bots }}
 
+      - name: Fail the check if the review did not complete
+        if: always() && steps.selfmod.outputs.self_mod != 'true'
+        shell: bash
+        env:
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${EXECUTION_FILE:-}" || ! -f "$EXECUTION_FILE" ]]; then
+            echo "::error::Claude review produced no execution output — treating as a failed review."
+            exit 1
+          fi
+          result="$(jq -s 'flatten | map(select(.type=="result")) | last // empty' "$EXECUTION_FILE")"
+          if [[ -z "$result" || "$result" == "null" ]]; then
+            echo "::error::No result object in execution output — review did not finish."
+            exit 1
+          fi
+          is_error="$(jq -r '.is_error // false' <<< "$result")"
+          subtype="$(jq -r '.subtype // ""' <<< "$result")"
+          if [[ "$is_error" == "true" || "$subtype" == error_* ]]; then
+            echo "::error::Claude review ended in an error state (is_error=$is_error, subtype=$subtype)."
+            jq '{subtype, is_error, num_turns, duration_ms, permission_denials_count}' <<< "$result" || true
+            exit 1
+          fi
+          echo "Claude review completed cleanly (subtype=$subtype)."
+
       # With sticky disabled, every run leaves its own review comment. Collapse
       # the older ones (minimize as OUTDATED) so the PR shows one expanded,
       # current review with history folded beneath it. Only THIS workflow's
