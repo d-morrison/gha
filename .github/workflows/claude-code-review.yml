@@ -350,11 +350,13 @@ jobs:
           fi
           # Include the run URL so the collapse step can match this comment by
           # run ID (same regex: `actions/runs/<id>` in the body).
-          BODY="**Claude finished review** — [View run]($RUN_URL)
-
----
-
-$REVIEW"
+          # Use printf to keep `---` off column 0: a bare `---` on its own
+          # line at column 0 in a YAML run block is treated as a document
+          # separator by both PyYAML and GitHub Actions' parser, truncating
+          # the script mid-string and producing "unexpected EOF" on the runner.
+          BODY=$(printf '%s\n\n---\n\n%s' \
+            "**Claude finished review** — [View run]($RUN_URL)" \
+            "$REVIEW")
           gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
 
       # With sticky disabled, every run leaves its own review comment. Collapse
