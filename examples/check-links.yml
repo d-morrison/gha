@@ -23,5 +23,6 @@ jobs:
     uses: d-morrison/gha/.github/workflows/check-links.yml@v1
     # with:
     #   lychee-config: lychee.toml       # use a repo-local config instead of the bundled default
+    #   fail-if-empty: true              # fail when no links are found (default: false)
     #   create-issue-on-main: true
     #   skip-label: 'links checked by hand'

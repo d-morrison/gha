@@ -16,6 +16,9 @@ inputs:
   fail:
     description: Fail the action when broken links are found.
     default: 'true'
+  fail-if-empty:
+    description: Fail the action when no links are found.
+    default: 'false'
 runs:
   using: composite
   steps:
@@ -45,5 +48,6 @@ runs:
       with:
         args: ${{ steps.cfg.outputs.args }} --config ${{ steps.cfg.outputs.config }}
         fail: ${{ inputs.fail }}
+        failIfEmpty: ${{ inputs.fail-if-empty }}
       env:
         GITHUB_TOKEN: ${{ github.token }}

@@ -11,6 +11,10 @@ on:
         description: Arguments/globs passed to lychee; if empty, a sensible default glob set is used.
         type: string
         default: ''
+      fail-if-empty:
+        description: Fail the workflow run when no links are found.
+        type: boolean
+        default: false
       create-issue-on-main:
         description: File an issue when links break on the main branch.
         type: boolean
@@ -55,6 +59,7 @@ jobs:
         with:
           lychee-config: ${{ inputs.lychee-config }}
           lychee-args: ${{ inputs.lychee-args }}
+          fail-if-empty: ${{ inputs.fail-if-empty }}
 
       - name: Create issue on main branch if links are broken
         if: failure() && github.ref == 'refs/heads/main' && inputs.create-issue-on-main
