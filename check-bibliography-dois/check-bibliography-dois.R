@@ -61,9 +61,9 @@ check_doi_field <- function(entry) {
 #' Validate that a DOI resolves to a valid URL
 #'
 #' @param doi DOI string
-#' @param retry_on_403 Whether to retry on 403 errors (default TRUE)
+#' @param retry_on_network_error Whether to retry on network errors (default TRUE)
 #' @return List with is_valid, error_message, and status_code
-validate_doi_url <- function(doi, retry_on_403 = TRUE) {
+validate_doi_url <- function(doi, retry_on_network_error = TRUE) {
   # Clean up DOI
   doi <- trimws(doi)
 
@@ -81,8 +81,8 @@ validate_doi_url <- function(doi, retry_on_403 = TRUE) {
   doi_identifier <- doi_match
   doi_url <- sprintf("https://doi.org/%s", doi_identifier)
 
-  # Try up to 3 times for 403 errors
-  max_attempts <- if (retry_on_403) 3 else 1
+  # Try up to 3 times on transient network errors
+  max_attempts <- if (retry_on_network_error) 3 else 1
   last_error <- NULL
 
   for (attempt in 1:max_attempts) {
