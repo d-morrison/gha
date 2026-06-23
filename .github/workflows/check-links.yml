@@ -12,7 +12,7 @@ on:
         type: string
         default: ''
       fail-if-empty:
-        description: Fail the action when no links are found.
+        description: Fail the workflow run when no links are found.
         type: boolean
         default: false
       create-issue-on-main:
