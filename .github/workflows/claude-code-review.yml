@@ -138,10 +138,11 @@ jobs:
         with:
           submodules-token: ${{ secrets.SUBMODULES_TOKEN }}
 
-      # Clear the human reviewers before Claude runs so they aren't notified
-      # mid-run, then re-add them when Claude finishes so the re-add fires a
-      # fresh notification — letting the human see Claude's review before
-      # starting their own. Also snapshot the PR head SHA for the post-step.
+      # Clear the requested reviewers (human and AI, e.g. Copilot) before
+      # Claude runs so they aren't notified mid-run, then re-add them when
+      # Claude finishes so the re-add fires a fresh notification — letting a
+      # reviewer see Claude's review before starting their own. Also snapshot
+      # the PR head SHA for the post-step.
       - name: Stash and clear reviewers; record starting head SHA
         id: stash
         if: steps.selfmod.outputs.self_mod != 'true'
@@ -156,8 +157,14 @@ jobs:
           REVIEWERS_JSON=$(gh api "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers")
           USERS=$(echo "$REVIEWERS_JSON" | jq -c '[.users[].login]')
           TEAMS=$(echo "$REVIEWERS_JSON" | jq -c '[.teams[].slug]')
+          # Capture AI reviewers (bot-type users, e.g. Copilot) separately. The
+          # commit path of the re-assign step routes human re-requests through
+          # assignees and would otherwise drop these; this lets it put them back.
+          # (`user.type` is always present in the REST user object.)
+          AI_USERS=$(echo "$REVIEWERS_JSON" | jq -c '[.users[] | select(.type == "Bot") | .login]')
           echo "users=$USERS" >> "$GITHUB_OUTPUT"
           echo "teams=$TEAMS" >> "$GITHUB_OUTPUT"
+          echo "ai_users=$AI_USERS" >> "$GITHUB_OUTPUT"
           if [ "$USERS" != "[]" ] || [ "$TEAMS" != "[]" ]; then
             # `|| true` is intentional and asymmetric with the restore step: a
             # failed stash leaves reviewers in place (recoverable); a failed
@@ -446,6 +453,7 @@ $REVIEW"
           HEAD_BEFORE: ${{ steps.stash.outputs.head_before }}
           USERS_BEFORE: ${{ steps.stash.outputs.users }}
           TEAMS_BEFORE: ${{ steps.stash.outputs.teams }}
+          AI_USERS_BEFORE: ${{ steps.stash.outputs.ai_users }}
         run: |
           PR_JSON=$(gh api "repos/$REPO/pulls/$PR_NUMBER")
           HEAD_AFTER=$(echo "$PR_JSON" | jq -r '.head.sha')
@@ -467,12 +475,31 @@ $REVIEW"
             exit 0
           fi
 
-          # Claude pushed commits: route the re-request to the PR's human
-          # assignees (bot assignees filtered out).
+          # Claude pushed commits. Re-request the PR's human assignees (bot
+          # assignees filtered out) so the people who own the PR see the new
+          # commits, AND put back any AI reviewers (e.g. Copilot) that were
+          # requested before the stash — clearing them was temporary, and a
+          # fresh commit is exactly when their re-review is wanted. These are
+          # two separate POSTs (POST adds to the requested set, it doesn't
+          # replace it): the human re-request fails loudly if it errors, while
+          # the AI re-request is best-effort so a bad bot login can't undo it.
           ASSIGNEES=$(echo "$PR_JSON" | jq -c '[.assignees[] | select(.type == "User") | .login]')
-          if [ "$ASSIGNEES" = "[]" ]; then
-            echo "PR has no human assignees; leaving reviewers cleared."
-            exit 0
+          if [ "$ASSIGNEES" != "[]" ]; then
+            echo "Re-requesting human assignees: $ASSIGNEES"
+            jq -n --argjson users "$ASSIGNEES" '{reviewers: $users}' \
+              | gh api -X POST "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers" --input -
+          else
+            echo "PR has no human assignees."
           fi
-          jq -n --argjson users "$ASSIGNEES" '{reviewers: $users}' \
-            | gh api -X POST "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers" --input -
+
+          AI_USERS=${AI_USERS_BEFORE:-[]}
+          if [ "$AI_USERS" != "[]" ]; then
+            echo "Restoring AI reviewers: $AI_USERS"
+            jq -n --argjson users "$AI_USERS" '{reviewers: $users}' \
+              | gh api -X POST "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers" --input - \
+              || echo "::warning::Could not restore AI reviewers ($AI_USERS)."
+          fi
+
+          if [ "$ASSIGNEES" = "[]" ] && [ "$AI_USERS" = "[]" ]; then
+            echo "No human assignees and no AI reviewers to restore; leaving reviewers cleared."
+          fi
