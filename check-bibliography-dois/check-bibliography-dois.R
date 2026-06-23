@@ -111,7 +111,7 @@ validate_doi_url <- function(doi, retry_on_403 = TRUE) {
       } else if (status_code == 403 || status_code == 405) {
         # 403: DOI resolved but publisher requires authentication (paywalled).
         # 405: Publisher rejects the GET method for bot requests.
-        # Both mean the DOI is valid — treat as success.
+        # Both mean the DOI is valid -- treat as success.
         return(list(
           is_valid = TRUE,
           error = NULL,
