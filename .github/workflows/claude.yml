@@ -545,8 +545,8 @@ jobs:
                - PRs only: `gh api 'repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number || github.event.issue.number }}/reviews' --paginate`
             2. Identify entries where ALL of: `created_at` (reviews use
                `submitted_at`) is strictly later than the triggering event;
-               `body` contains `@claude`; and `user.login` is neither
-               `claude[bot]` nor `github-actions[bot]`.
+               `body` contains `@claude`; and `user.type` (if present) is
+               not `"Bot"`.
             3. Address each match in this same session (chronological order),
                then repeat from step 1. Stop when none remain.
             4. Every late comment you addressed in step 3 also queued its OWN
@@ -854,10 +854,6 @@ jobs:
         run: |
           # `|| late=0` keeps the default `-e` from aborting on a transient gh
           # api error, degrading to "no late review found" rather than failing.
-          # Bot activity is filtered here via the API `user.type` field; the dedup
-          # check and the polling prompt instead match bot *logins*
-          # (github-actions[bot] / claude[bot]) — two idioms, one "ignore
-          # bot-authored activity" intent.
           late=$(
             { gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate --jq '.[]' 2>/dev/null
               gh api "repos/$REPO/pulls/$PR_NUMBER/comments"  --paginate --jq '.[]' 2>/dev/null

@@ -79,9 +79,7 @@ jobs:
       (
         github.event.pull_request.draft == false &&
         github.event.pull_request.head.repo.full_name == github.repository &&
-        github.actor != 'dependabot[bot]' &&
-        github.event.sender.type != 'Bot' &&
-        !endsWith(github.actor, '[bot]')
+        github.event.sender.type != 'Bot'
       )
 
     runs-on: ubuntu-latest
