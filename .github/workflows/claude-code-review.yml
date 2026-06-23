@@ -489,7 +489,7 @@ $REVIEW"
             jq -n --argjson users "$ASSIGNEES" '{reviewers: $users}' \
               | gh api -X POST "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers" --input -
           else
-            echo "PR has no human assignees."
+            echo "No human assignees to re-request."
           fi
 
           AI_USERS=${AI_USERS_BEFORE:-[]}
