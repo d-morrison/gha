@@ -47,7 +47,7 @@ check_doi_field <- function(entry) {
   entry_key <- entry$BIBTEXKEY
 
   if (entry_type %in% c("book", "article")) {
-    if (is.na(entry$DOI) || entry$DOI == "") {
+    if (!("DOI" %in% names(entry)) || is.na(entry$DOI) || entry$DOI == "") {
       return(list(
         has_doi = FALSE,
         error = sprintf("Entry '%s' (%s) is missing DOI field", entry_key, entry_type)
@@ -108,14 +108,15 @@ validate_doi_url <- function(doi, retry_on_403 = TRUE) {
           error = NULL,
           status_code = status_code
         ))
-      } else if (status_code == 403 && attempt < max_attempts) {
-        # Store error and continue to retry
-        last_error <- list(
-          is_valid = FALSE,
-          error = sprintf("DOI URL returned status %d", status_code),
+      } else if (status_code == 403) {
+        # 403 means the DOI resolved to the publisher's page but the page
+        # requires authentication (paywalled article). The DOI itself is
+        # valid — treat as success.
+        return(list(
+          is_valid = TRUE,
+          error = NULL,
           status_code = status_code
-        )
-        NULL  # Continue loop
+        ))
       } else {
         return(list(
           is_valid = FALSE,
