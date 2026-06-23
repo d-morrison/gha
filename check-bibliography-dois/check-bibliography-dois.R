@@ -47,7 +47,7 @@ check_doi_field <- function(entry) {
   entry_key <- entry$BIBTEXKEY
 
   if (entry_type %in% c("book", "article")) {
-    if (is.na(entry$DOI) || entry$DOI == "") {
+    if (!("DOI" %in% names(entry)) || is.na(entry$DOI) || entry$DOI == "") {
       return(list(
         has_doi = FALSE,
         error = sprintf("Entry '%s' (%s) is missing DOI field", entry_key, entry_type)
@@ -61,9 +61,9 @@ check_doi_field <- function(entry) {
 #' Validate that a DOI resolves to a valid URL
 #'
 #' @param doi DOI string
-#' @param retry_on_403 Whether to retry on 403 errors (default TRUE)
+#' @param retry_on_network_error Whether to retry on network errors (default TRUE)
 #' @return List with is_valid, error_message, and status_code
-validate_doi_url <- function(doi, retry_on_403 = TRUE) {
+validate_doi_url <- function(doi, retry_on_network_error = TRUE) {
   # Clean up DOI
   doi <- trimws(doi)
 
@@ -81,8 +81,8 @@ validate_doi_url <- function(doi, retry_on_403 = TRUE) {
   doi_identifier <- doi_match
   doi_url <- sprintf("https://doi.org/%s", doi_identifier)
 
-  # Try up to 3 times for 403 errors
-  max_attempts <- if (retry_on_403) 3 else 1
+  # Try up to 3 times on transient network errors
+  max_attempts <- if (retry_on_network_error) 3 else 1
   last_error <- NULL
 
   for (attempt in 1:max_attempts) {
@@ -108,14 +108,15 @@ validate_doi_url <- function(doi, retry_on_403 = TRUE) {
           error = NULL,
           status_code = status_code
         ))
-      } else if (status_code == 403 && attempt < max_attempts) {
-        # Store error and continue to retry
-        last_error <- list(
-          is_valid = FALSE,
-          error = sprintf("DOI URL returned status %d", status_code),
+      } else if (status_code == 403 || status_code == 405) {
+        # 403: DOI resolved but publisher requires authentication (paywalled).
+        # 405: Publisher rejects the GET method for bot requests.
+        # Both mean the DOI is valid -- treat as success.
+        return(list(
+          is_valid = TRUE,
+          error = NULL,
           status_code = status_code
-        )
-        NULL  # Continue loop
+        ))
       } else {
         return(list(
           is_valid = FALSE,
