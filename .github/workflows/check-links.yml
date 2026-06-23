@@ -45,8 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
-          if printf '%s
-' "$LABELS" | grep -Fxq "$SKIP_LABEL"; then
+          if printf '%s\n' "$LABELS" | grep -Fxq "$SKIP_LABEL"; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Link check skipped - '$SKIP_LABEL' label present on PR"
           else
@@ -60,6 +59,7 @@ jobs:
         with:
           lychee-config: ${{ inputs.lychee-config }}
           lychee-args: ${{ inputs.lychee-args }}
+          fail-if-empty: ${{ inputs.fail-if-empty }}
 
       - name: Create issue on main branch if links are broken
         if: failure() && github.ref == 'refs/heads/main' && inputs.create-issue-on-main
