@@ -1,8 +1,14 @@
 # Publish this repo's Quarto documentation site to GitHub Pages on `main`.
-# Dogfoods the reusable quarto-publish workflow exactly as a consumer would.
+# Dogfoods the reusable quarto-publish workflow.
+#
+# Uses the local ./ ref rather than @v2: the branch-deploy quarto-publish isn't
+# at a released major tag yet (it ships in #118). Switch to
+# `d-morrison/gha/.github/workflows/quarto-publish.yml@v2` once v2 is cut, the
+# same way the selftest exercises pre-release capabilities via ./ until release.
 #
 # One-time repo setup: Settings -> Pages -> Build and deployment -> Source =
-# "GitHub Actions". Until then the deploy step fails with a clear message.
+# "Deploy from a branch", branch `gh-pages` / `(root)`. Do this AFTER the first
+# branch deploy has populated gh-pages, so the site never serves an empty root.
 name: Quarto Publish (website)
 
 on:
@@ -10,18 +16,17 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Let an in-flight Pages deploy finish rather than cancelling it.
+# Serialize deploys so two pushes don't race on the gh-pages branch.
 concurrency:
-  group: pages
+  group: gh-pages
   cancel-in-progress: false
 
 jobs:
   publish:
     permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: d-morrison/gha/.github/workflows/quarto-publish.yml@v1
+      # Push the rendered site to gh-pages.
+      contents: write
+    uses: ./.github/workflows/quarto-publish.yml
     with:
       # The Quarto project lives in website/; it is pure markdown, so the other
       # defaults (setup-r: false, output-dir: _site, deploy: true) are correct.
