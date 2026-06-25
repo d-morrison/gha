@@ -79,7 +79,7 @@ jobs:
     #   pre-render-artifact: demo-media       # inject a prior job's artifact before render
     #   pre-render-artifact-path: website/media
     #   deploy: false           # render only (e.g. a build check); skips the gh-pages push
-    #                           # (still grant contents: write — the deploy job is declared)
+    #                           # (still grant contents: write; the deploy job is declared)
     # secrets:
     #   SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
 ```

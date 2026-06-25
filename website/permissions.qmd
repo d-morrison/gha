@@ -19,7 +19,7 @@ already include the right `permissions:` blocks; copy them as-is.
 - `quarto-publish` deploys to the `gh-pages` branch, so grant
   `contents: write`, and set Settings -> Pages -> Source to
   "Deploy from a branch", branch `gh-pages` / `(root)` once.
-  Grant `contents: write` even with `deploy: false` — the deploy job is part of
+  Grant `contents: write` even with `deploy: false`: the deploy job is part of
   the workflow, so the caller must grant its permissions even when it is skipped.
 - `preview` (build half, read-only) needs only `contents: read` (the default).
 - `preview-deploy` (deploy half) pushes `gh-pages` and comments, so grant
