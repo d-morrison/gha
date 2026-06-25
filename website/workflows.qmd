@@ -1,0 +1,128 @@
+---
+title: "Workflows"
+---
+
+Every capability is a reusable workflow you call with a small stub.
+The table below is the full catalog;
+each workflow links to its reference page, with full input tables and a copy-paste example.
+
+| Workflow | Purpose | Key inputs |
+|---|---|---|
+| [`check-bibliography-dois.yml`](reference/check-bibliography-dois.qmd) | Validate book/article BibTeX entries have resolvable DOIs matching CrossRef metadata | `exclude-keys`, `install-quarto`, `no-metadata-check` |
+| [`check-non-standard-chars.yml`](reference/check-non-standard-chars.qmd) | Detect curly quotes and en/em dashes in `.qmd` and `.R` files | `python-version` |
+| [`check-phi.yml`](reference/check-phi.qmd) | Scan PRs (added lines only) for content that looks like PHI | `detectors`, `paths-ignore`, `allowlist-file`, `fail` |
+| [`check-links.yml`](reference/check-links.qmd) | lychee link check with bundled config, PR skip-label, and auto-issue on `main` | `lychee-config`, `lychee-args`, `fail-if-empty`, `create-issue-on-main`, `skip-label` |
+| [`check-news.yml`](reference/check-news.qmd) | Enforce a `NEWS.md` changelog entry on PRs | `changelog` |
+| [`summary.yml`](reference/summary.qmd) | AI summary comment on newly opened issues | -- |
+| [`quarto-publish.yml`](reference/quarto-publish.qmd) | Render a Quarto site and deploy it to GitHub Pages | `path`, `setup-r`, `r-packages`, `use-renv`, `tinytex`, `output-dir`, `checkout-submodules`, `deploy` |
+| [`preview.yml`](reference/preview.qmd) | Build half of the PR-preview family: render in the PR context and upload an artifact (read-only) | `path`, `r-version`, `apt-packages`, `use-renv`, `install-package`, `setup-chrome`, `submodules`, `render-profile` |
+| [`preview-deploy.yml`](reference/preview-deploy.qmd) | Deploy half: publish the artifact to `gh-pages` and comment the preview link | -- |
+| [`cleanup-pr-previews.yml`](reference/cleanup-pr-previews.qmd) | Housekeeping: delete preview directories for closed PRs | `preview-dir` |
+| [`claude.yml`](reference/claude.qmd) | Agent-mode Claude Code bot: responds to `@claude`, edits files, opens/updates PRs | `setup-r`, `install-quarto`, `use-renv`, `checkout-submodules`, `reviewer` |
+| [`claude-code-review.yml`](reference/claude-code-review.qmd) | Read-only Claude PR review | `pr-number`, `prompt-addendum`, `checkout-submodules`, `allowed-bots` |
+| [`bump-submodule.yml`](reference/bump-submodule.qmd) | Update a submodule to upstream HEAD and open a PR when the pointer moves | `submodule-path`, `remote-branch`, `base-branch`, `pr-branch` |
+| [`sync-shared-fragments.yml`](reference/sync-shared-fragments.qmd) | Vendor files from an upstream repo (pinned to a commit) and open a PR when they change | `source-repo`, `source-ref`, `source-paths`, `dest-dir`, `manifest-path` |
+
+Pin every reference to `@v1`.
+The stubs in [`examples/`](https://github.com/d-morrison/gha/tree/main/examples)
+already carry the right `permissions:` blocks; copy them as-is.
+
+## Quality checks {#quality-checks}
+
+These run on pull requests (and often on `main`) to keep a repo's content clean.
+
+- `check-bibliography-dois.yml` confirms BibTeX entries have DOIs that resolve and match CrossRef metadata.
+- `check-non-standard-chars.yml` flags curly quotes and en/em dashes in `.qmd` and `.R` files,
+  which can break Quarto and R rendering.
+- `check-links.yml` runs a [lychee](https://github.com/lycheeverse/lychee) link check
+  with a bundled config, a PR skip-label, and an auto-filed issue when `main` breaks.
+- `check-news.yml` enforces a `NEWS.md` changelog entry on each PR.
+- `check-phi.yml` scans for content that looks like protected health information; see [below](#phi-scanning).
+
+## PHI scanning {#phi-scanning}
+
+`check-phi` is a **heuristic tripwire, not a HIPAA compliance tool.**
+It flags patterns that should almost never be committed:
+US Social Security numbers, medical record numbers, dates of birth,
+and PHI-suggestive column headers in delimited data files (`.csv`/`.tsv`/`.psv`),
+so a human reviews before the data merges.
+It is tuned for high precision, so it misses free-text PHI such as patient names.
+
+- **Diff-scoped on PRs.** Only lines *added* by the PR are scanned;
+  `push` runs scan the whole tracked tree.
+- **Values are never printed.** Findings report only `file:line:col` and the detector name,
+  never the matched text, because a leaked identifier in a CI log is still a leak.
+- **Suppressing false positives.** Add a `phi-allow` comment on the line,
+  or list a regex in an allowlist file (defaults to `.github/phi-allowlist.txt`).
+  Use `fail: false` to downgrade findings to warnings.
+
+The `phone` and `email` detectors exist but are **off by default** because they are noisy in source;
+enable them through the `detectors` input.
+
+## Quarto sites {#quarto-sites}
+
+This family builds and ships Quarto sites, and it builds this very site.
+
+- `quarto-publish.yml` renders a Quarto project and deploys it to GitHub Pages on `main`.
+  One-time setup: set Settings -> Pages -> Source to "GitHub Actions".
+- The **preview family** publishes a rendered site for each open PR
+  to a `pr-preview/pr-<n>/` directory on `gh-pages`. It is three cooperating workflows:
+  1. `preview.yml` (build) renders the site and uploads it plus PR metadata as an artifact.
+     It runs **read-only** in the possibly-forked PR context, so it cannot write to the base repo.
+  2. `preview-deploy.yml` (deploy) triggers on the build's `workflow_run` completion,
+     downloads the artifact, and publishes it to `gh-pages` in the **base-repo** context,
+     then comments the preview link.
+  3. `cleanup-pr-previews.yml` (housekeeping) runs on a schedule and removes
+     preview directories for PRs that have closed.
+
+The build/deploy split is a **trust boundary**:
+untrusted fork code only ever runs in the read-only build half,
+while the privileged `gh-pages` push happens in the deploy half against base-repo code.
+Do not collapse them into one job.
+
+Two wiring requirements:
+
+- The deploy stub's `on: workflow_run: workflows:` value **must match the build stub's `name:`**.
+  That string is how `workflow_run` finds the build.
+- `workflow_run` and `schedule` triggers only fire for the copy of the file on the
+  **default branch**, so previews and cleanup do not take effect until the stubs merge to `main`.
+
+This repo dogfoods all four.
+The caller stubs live in
+[`.github/workflows/`](https://github.com/d-morrison/gha/tree/main/.github/workflows):
+`website-publish.yml`, `website-preview.yml`, `website-preview-deploy.yml`, and
+`website-preview-cleanup.yml`.
+They render this pure-markdown site with the R machinery turned off
+(no renv, no `R CMD INSTALL`, no Chrome).
+
+## Claude bots {#claude-bots}
+
+The two Claude workflows are a pair.
+
+- `claude.yml` runs the agent-mode Claude Code bot: it responds to `@claude` mentions,
+  edits files, and opens or updates PRs.
+- `claude-code-review.yml` runs a read-only Claude review:
+  inline findings on `pull_request` runs, a consolidated summary on dispatched runs.
+
+An `@claude review` mention (or any commit Claude pushes) routes through `claude.yml`,
+which dispatches `claude-code-review.yml` via `workflow_dispatch`.
+Install both, and keep the review stub named `claude-code-review.yml`
+(or set `claude.yml`'s `review-workflow-file` input to match) so the dispatch resolves.
+
+## Shared-content sync {#shared-content-sync}
+
+Two repos can share single-source-of-truth content and keep both copies current
+without hand-bumping. The pair handles the two directions:
+
+- `bump-submodule.yml` is for the side that vendors the other repo as a git submodule.
+  A scheduled run advances the submodule to its upstream HEAD and opens a PR when it moved.
+- `sync-shared-fragments.yml` is for the side that cannot add a submodule
+  because the other repo already submodules *it* (a mutual submodule would recurse).
+  It vendors a pinned copy of the named files into a `dest-dir`,
+  records the source repo and commit in a JSON manifest, and opens a PR when the copy changes.
+
+Both reuse the `open-sync-pr` composite,
+which commits staged changes to a reused automation branch and opens or updates one PR
+(a no-op when nothing changed).
+Path-filter or scope each side to the *other* repo's shared content
+so the two auto-PRs do not ping-pong.

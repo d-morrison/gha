@@ -1,0 +1,15 @@
+# Housekeeping half of the PR-preview family: periodically delete gh-pages
+# preview directories for PRs that are no longer open.
+name: Website Preview Cleanup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sunday at midnight UTC
+
+jobs:
+  cleanup:
+    permissions:
+      contents: write
+      pull-requests: read
+    uses: d-morrison/gha/.github/workflows/cleanup-pr-previews.yml@v1

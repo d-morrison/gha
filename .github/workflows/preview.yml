@@ -13,6 +13,14 @@ name: Quarto Preview Build (reusable)
 on:
   workflow_call:
     inputs:
+      path:
+        description: >-
+          Path (relative to the caller repo root) to the Quarto project to
+          render: the directory containing _quarto.yml. Defaults to the repo
+          root. Set it when the site lives in a subdirectory (matches
+          quarto-publish's `path`).
+        type: string
+        default: '.'
       r-version:
         description: R version to install with r-lib/actions/setup-r.
         type: string
@@ -73,6 +81,7 @@ jobs:
         # 'true'/'false' when passed to the composite action, which compares
         # them as strings (e.g. `inputs.use-renv == 'true'`).
         with:
+          path: ${{ inputs.path }}
           r-version: ${{ inputs.r-version }}
           apt-packages: ${{ inputs.apt-packages }}
           use-renv: ${{ inputs.use-renv }}

@@ -28,6 +28,7 @@ jobs:
       contents: read
     uses: d-morrison/gha/.github/workflows/preview.yml@v1
     # with:
+    #   path: website                      # Quarto project lives in a subdir (default: repo root)
     #   r-version: '4.6.0'
     #   apt-packages: 'jags libglpk-dev'   # override the default system-deps list
     #   use-renv: true                     # set false for non-renv repos

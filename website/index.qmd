@@ -1,0 +1,52 @@
+---
+title: "d-morrison/gha"
+subtitle: "Central, reusable GitHub Actions for R-package and Quarto repositories"
+---
+
+This site documents [`d-morrison/gha`](https://github.com/d-morrison/gha),
+a set of reusable GitHub Actions shared across the
+`d-morrison`, `UCD-SERG`, `ucdavis`, `UCLA-PHP`, and `UCD-IDDRC` owners.
+It is modeled on
+[`r-lib/actions`](https://github.com/r-lib/actions) and
+[`easystats/workflows`](https://github.com/easystats/workflows):
+a repo calls a shared workflow with a tiny stub instead of carrying its own copy.
+
+The repo is **public** so it can be referenced from repositories across those owners.
+
+## How it works
+
+Each capability ships as two layers:
+
+- A **composite action** (for example `check-bibliography-dois/action.yml`)
+  bundles the real steps and any helper script.
+  It is referenced as `d-morrison/gha/<name>@v1`.
+- A **reusable workflow** (`.github/workflows/<name>.yml`, `on: workflow_call`)
+  wraps the composite, declares permissions, and checks out the caller's repo.
+  This is what consumer repos target.
+
+A consumer repo adds a small caller stub
+(see the [`examples/`](https://github.com/d-morrison/gha/tree/main/examples) directory):
+
+```yaml
+name: Check Bibliography DOIs
+on:
+  push: { branches: [main] }
+  pull_request:
+  workflow_dispatch:
+jobs:
+  check:
+    uses: d-morrison/gha/.github/workflows/check-bibliography-dois.yml@v1
+```
+
+Pin to `@v1`, a moving major tag updated as fixes land.
+Do not reference `@main` from consumers.
+
+## Where to go next
+
+- [Workflows](workflows.qmd) catalogs every reusable workflow and what it does.
+- [Permissions](permissions.qmd) lists the `GITHUB_TOKEN` permissions and secrets each one needs.
+- [Versioning](versioning.qmd) explains the moving `@v1` tag and how third-party actions are pinned.
+
+This very site is built and shipped by the workflows it documents:
+[`quarto-publish`](workflows.qmd#quarto-sites) deploys it to GitHub Pages,
+and the [`preview`](workflows.qmd#quarto-sites) family renders a preview for each pull request.

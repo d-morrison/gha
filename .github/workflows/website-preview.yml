@@ -1,0 +1,53 @@
+# Build half of the PR-preview family for this repo's own documentation site
+# (the Quarto project under website/). Renders the site read-only in the PR
+# context and uploads it + PR metadata as the pr-preview-site artifact;
+# website-preview-deploy.yml publishes it to gh-pages.
+#
+# This calls the LOCAL ./preview composite rather than the preview.yml@v1
+# reusable workflow, because the `path` input it relies on is not in the @v1
+# tag yet (it ships in this PR). That matches _selftest.yml's pattern of
+# exercising a pre-release composite via its local ./ ref. Switch to
+# preview.yml@v1 once a release moves @v1 forward. Running the real composite
+# here also serves as the per-PR check that the new `path` input renders a
+# subdirectory site, so the paths filter re-triggers it when the composite
+# changes.
+#
+# IMPORTANT: keep this workflow's `name:` in sync with the `workflows:` list in
+# website-preview-deploy.yml -- that is how the deploy half finds this run.
+name: Website Preview Build
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, closed]
+    paths:
+      - 'website/**'
+      - 'preview/**'
+      - '.github/workflows/website-preview.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Cancel a superseded build when a newer commit on the same ref arrives.
+    concurrency:
+      group: website-preview-${{ github.ref }}
+      cancel-in-progress: true
+    # Read-only: this job must never write to the base repo. The deploy half
+    # (website-preview-deploy.yml) does all writes in the base-repo context.
+    permissions:
+      contents: read
+    steps:
+      # Check out first so the local ./preview composite is available; the
+      # composite then does its own checkout of the PR context to render.
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Build preview
+        uses: ./preview
+        # This site is pure markdown, not an R package, so turn off the R/renv
+        # machinery the preview family defaults on for rme-style consumers.
+        with:
+          path: website
+          use-renv: 'false'
+          install-package: 'false'
+          setup-chrome: 'false'
+          submodules: 'false'
+          apt-packages: ''
