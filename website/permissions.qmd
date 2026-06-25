@@ -16,10 +16,11 @@ already include the right `permissions:` blocks; copy them as-is.
   `issues: write`, `pull-requests: read`, `contents: read`.
 - `summary` comments on issues and calls the models API, so grant
   `issues: write`, `models: read`, `contents: read`.
-- `quarto-publish` deploys to GitHub Pages, so grant
-  `pages: write`, `id-token: write`, `contents: read`,
-  and set Settings -> Pages -> Source to "GitHub Actions" once.
-  Build-only callers (`deploy: false`) need just `contents: read`.
+- `quarto-publish` deploys to the `gh-pages` branch, so grant
+  `contents: write`, and set Settings -> Pages -> Source to
+  "Deploy from a branch", branch `gh-pages` / `(root)` once.
+  Grant `contents: write` even with `deploy: false`: the deploy job is part of
+  the workflow, so the caller must grant its permissions even when it is skipped.
 - `preview` (build half, read-only) needs only `contents: read` (the default).
 - `preview-deploy` (deploy half) pushes `gh-pages` and comments, so grant
   `contents: write`, `pull-requests: write`, `actions: read`.

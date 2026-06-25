@@ -1,15 +1,16 @@
 name: Build a Quarto site for GitHub Pages
 description: >-
-  Set up Quarto (optionally R/renv and TinyTeX), render a Quarto project, and
-  stage its rendered output as a GitHub Pages artifact. The reusable
-  quarto-publish.yml workflow wraps this and adds the Pages deploy; callers that
-  only want to build (e.g. a preview job) can use this composite directly.
+  Set up Quarto (optionally R/renv and TinyTeX) and render a Quarto project into
+  its output directory. The reusable quarto-publish.yml workflow wraps this and
+  deploys the rendered site to the gh-pages branch; callers that only want to
+  render (e.g. a preview build, or to deploy the output themselves) can use this
+  composite directly and read the site from "<path>/<output-dir>".
 inputs:
   path:
     description: >-
       Path (relative to the caller repo root) to the Quarto project to render:
-      the directory containing _quarto.yml. Its rendered output (at the
-      output-dir below) is staged for Pages.
+      the directory containing _quarto.yml. Its rendered output lands at the
+      output-dir below.
     default: '.'
   setup-r:
     description: >-
@@ -35,7 +36,7 @@ inputs:
     default: ''
   output-dir:
     description: >-
-      Directory the rendered site is written to and staged from, relative to
+      Directory the rendered site is written to, relative to
       `path`. Forwarded to `quarto render --output-dir`, so this input is
       authoritative — it overrides any `output-dir` set in the project's
       `_quarto.yml`. Defaults to `_site`.
@@ -95,8 +96,3 @@ runs:
           echo "::error::Rendered output not found at '$SITE_DIR' after 'quarto render'; the render step produced no site."
           exit 1
         fi
-
-    - name: Upload Pages artifact
-      uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-      with:
-        path: ${{ inputs.path }}/${{ inputs.output-dir }}

@@ -63,8 +63,8 @@ enable them through the `detectors` input.
 
 This family builds and ships Quarto sites, and it builds this very site.
 
-- `quarto-publish.yml` renders a Quarto project and deploys it to GitHub Pages on `main`.
-  One-time setup: set Settings -> Pages -> Source to "GitHub Actions".
+- `quarto-publish.yml` renders a Quarto project and deploys it to the `gh-pages` branch on `main`.
+  One-time setup: set Settings -> Pages -> Source to "Deploy from a branch", branch `gh-pages` / `(root)`.
 - The **preview family** publishes a rendered site for each open PR
   to a `pr-preview/pr-<n>/` directory on `gh-pages`. It is three cooperating workflows:
   1. `preview.yml` (build) renders the site and uploads it plus PR metadata as an artifact.

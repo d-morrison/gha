@@ -1,11 +1,13 @@
 name: Quarto Publish (reusable)
 
-# Render a Quarto project and deploy it to GitHub Pages. Wraps the
-# `quarto-publish` composite (setup + render + stage the Pages artifact) and
-# adds the Pages deploy. Consumers target this workflow with a small caller stub
-# (see examples/quarto-publish.yml) pinned to @v1.
+# Render a Quarto project and deploy it to the gh-pages branch, which GitHub
+# Pages serves. Wraps the `quarto-publish` composite (setup + render) and adds
+# a gh-pages deploy that preserves the PR-preview subtree. Consumers target this
+# workflow with a small caller stub (see examples/quarto-publish.yml) pinned to
+# @v1.
 #
-# One-time consumer setup: repo Settings -> Pages -> Source = "GitHub Actions".
+# One-time consumer setup: repo Settings -> Pages -> Source =
+# "Deploy from a branch", branch `gh-pages` / `(root)`.
 
 on:
   workflow_call:
@@ -37,7 +39,7 @@ on:
         type: string
         default: ''
       output-dir:
-        description: Directory the rendered site is written to and staged from (relative to `path`), forwarded to `quarto render --output-dir` (overrides any `_quarto.yml` setting). Defaults to `_site`.
+        description: Directory the rendered site is written to (relative to `path`), forwarded to `quarto render --output-dir` (overrides any `_quarto.yml` setting). Defaults to `_site`.
         type: string
         default: '_site'
       checkout-submodules:
@@ -59,23 +61,20 @@ on:
         type: string
         default: ''
       deploy:
-        description: Deploy the rendered site to GitHub Pages. Set false to build only (e.g. a PR preview).
+        description: Deploy the rendered site to the gh-pages branch. Set false to render only (e.g. a build check); the caller still grants contents:write, since the deploy job is part of the workflow.
         type: boolean
         default: true
     secrets:
       SUBMODULES_TOKEN:
         description: Token with read access to private submodules (only needed when checkout-submodules is true).
         required: false
-    outputs:
-      page_url:
-        description: The deployed GitHub Pages URL (empty when deploy is false).
-        value: ${{ jobs.deploy.outputs.page_url }}
 
 jobs:
-  # Build only: render and stage the Pages artifact. Held to contents:read with
-  # no environment, so a build-only caller (deploy: false, e.g. a PR preview) is
-  # never blocked by `github-pages` environment protection rules or granted
-  # Pages/id-token permissions it doesn't use.
+  # Render the site and stage it as an artifact. Held to contents:read so the
+  # render step never has write access — even though the caller grants
+  # contents:write (a reusable workflow's caller must grant write because the
+  # deploy job below declares it, even when deploy is false). Only the deploy
+  # job actually uses the write token.
   build:
     runs-on: ubuntu-latest
     permissions:
@@ -100,7 +99,12 @@ jobs:
           name: ${{ inputs.pre-render-artifact }}
           path: ${{ inputs.pre-render-artifact-path }}
 
-      - name: Build Pages artifact
+      - name: Render site
+        # Pinned @v1 per repo convention; the released tag moves to the
+        # render-only composite when this branch-deploy change ships as v2. The
+        # current @v1 composite also renders into output-dir (it just uploads a
+        # now-unused Pages artifact afterward), so the staged site below is the
+        # same either way.
         uses: d-morrison/gha/quarto-publish@v1
         with:
           path: ${{ inputs.path }}
@@ -111,22 +115,49 @@ jobs:
           apt-packages: ${{ inputs.apt-packages }}
           output-dir: ${{ inputs.output-dir }}
 
-  # Deploy the staged artifact to Pages. Only this job needs the elevated
-  # permissions and the github-pages environment, and it's skipped entirely
-  # when deploy is false.
+      - name: Stage rendered site
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: quarto-publish-site
+          path: ${{ inputs.path }}/${{ inputs.output-dir }}
+          retention-days: 1
+
+  # Push the staged site to gh-pages. Only this job needs contents:write, and
+  # it is skipped entirely when deploy is false.
   deploy:
     needs: build
     if: inputs.deploy
     runs-on: ubuntu-latest
     permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    outputs:
-      page_url: ${{ steps.deploy.outputs.page_url }}
+      contents: write
     steps:
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+      # JamesIves pushes to gh-pages from a git working copy, so check out first.
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Download staged site
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: quarto-publish-site
+          path: _quarto_publish_site
+
+      - name: Disable Jekyll on the served site
+        # Branch-served Pages runs the rendered output through Jekyll, which
+        # drops files and folders whose names start with `_` (Quarto emits
+        # `_`-prefixed assets). A `.nojekyll` at the gh-pages root turns Jekyll
+        # off for the whole site, previews included. `quarto publish gh-pages`
+        # adds this automatically; we deploy with JamesIves, so add it here.
+        shell: bash
+        run: touch _quarto_publish_site/.nojekyll
+
+      - name: Deploy to gh-pages
+        uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f # v4.8.0
+        with:
+          folder: _quarto_publish_site
+          branch: gh-pages
+          # Preserve the PR-preview subtree: the preview family writes per-PR
+          # sites under pr-preview/, and a main-site deploy must not wipe them.
+          # `pr-preview/` is the umbrella dir pr-preview-action documents for
+          # this "deploy both to gh-pages" case.
+          clean: true
+          clean-exclude: pr-preview/
