@@ -1,0 +1,156 @@
+name: Update testthat Snapshots (reusable)
+
+# Regenerate testthat snapshots, commit, and push. The snapshot
+# test/accept/commit body lives here; callers pass only what differs between
+# their triggers (ref, committer identity, PR vs. direct push mode).
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: >
+          Branch or SHA to check out. Defaults to the event ref when empty;
+          pass a branch name for workflow_dispatch callers or github.head_ref
+          for pull_request callers.
+        type: string
+        default: ''
+      pr-mode:
+        description: >
+          Use r-lib/actions/pr-fetch and pr-push instead of direct checkout
+          and push. Set true for PR-comment (issue_comment) triggers.
+        type: boolean
+        default: false
+      julia:
+        description: Set up the Julia runtime before running tests.
+        type: boolean
+        default: false
+      julia-version:
+        description: Julia version to install. Only used when julia is true.
+        type: string
+        default: '1'
+      julia-project:
+        description: >
+          Path to the Julia project to instantiate. Only used when julia
+          is true.
+        type: string
+        default: 'inst/julia'
+      extra-packages:
+        description: Extra R packages forwarded to r-lib/actions/setup-r-dependencies.
+        type: string
+        default: 'any::testthat'
+      needs:
+        description: needs label forwarded to r-lib/actions/setup-r-dependencies.
+        type: string
+        default: 'check'
+      apt-packages:
+        description: >
+          Space-separated apt packages to install before R setup. Leave empty
+          to skip the install step.
+        type: string
+        default: ''
+      commit-message:
+        description: Commit message for the snapshot update commit.
+        type: string
+        default: 'Update testthat snapshots [auto]'
+      committer-name:
+        description: Git committer name.
+        type: string
+        default: 'github-actions[bot]'
+      committer-email:
+        description: Git committer email.
+        type: string
+        default: '41898282+github-actions[bot]@users.noreply.github.com'
+
+jobs:
+  update-snapshots:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GITHUB_PAT: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ inputs.ref }}
+          token: ${{ github.token }}
+
+      - name: Fetch PR branch
+        if: inputs.pr-mode
+        uses: r-lib/actions/pr-fetch@v2.12.0
+        with:
+          repo-token: ${{ github.token }}
+
+      - name: Set up Julia
+        if: inputs.julia
+        uses: julia-actions/setup-julia@v3
+        with:
+          version: ${{ inputs.julia-version }}
+
+      - name: Cache Julia packages
+        if: inputs.julia
+        uses: julia-actions/cache@v2
+
+      - name: Install apt packages
+        if: inputs.apt-packages != ''
+        env:
+          APT_PACKAGES: ${{ inputs.apt-packages }}
+        shell: bash
+        run: |
+          sudo apt-get update
+          # word-splitting on $APT_PACKAGES is intentional
+          # shellcheck disable=SC2086
+          sudo apt-get install -y $APT_PACKAGES
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2.12.0
+        with:
+          use-public-rspm: true
+
+      - name: Set up R dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2.12.0
+        with:
+          extra-packages: ${{ inputs.extra-packages }}
+          needs: ${{ inputs.needs }}
+
+      - name: Instantiate Julia project
+        if: inputs.julia
+        env:
+          JULIA_PROJECT_PATH: ${{ inputs.julia-project }}
+        shell: bash
+        run: |
+          julia --startup-file=no --project="$JULIA_PROJECT_PATH" \
+            -e "using Pkg; Pkg.instantiate(); Pkg.precompile()"
+
+      - name: Run tests and accept snapshots
+        shell: Rscript {0}
+        run: |
+          devtools::load_all()
+          tryCatch(devtools::test(), error = function(e) {
+            message("First test run: ", conditionMessage(e))
+          })
+          testthat::snapshot_accept()
+          devtools::test()
+
+      - name: Commit snapshot changes
+        env:
+          COMMIT_MSG: ${{ inputs.commit-message }}
+          COMMITTER_NAME: ${{ inputs.committer-name }}
+          COMMITTER_EMAIL: ${{ inputs.committer-email }}
+        shell: bash
+        run: |
+          git config --local user.name "$COMMITTER_NAME"
+          git config --local user.email "$COMMITTER_EMAIL"
+          git add tests/testthat/_snaps
+          git diff --cached --quiet || git commit -m "$COMMIT_MSG"
+
+      - name: Push (direct)
+        if: ${{ !inputs.pr-mode }}
+        shell: bash
+        run: git push
+
+      - name: Push (PR mode)
+        if: inputs.pr-mode
+        uses: r-lib/actions/pr-push@v2.12.0
+        with:
+          repo-token: ${{ github.token }}
