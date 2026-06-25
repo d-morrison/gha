@@ -129,11 +129,11 @@ runs:
       uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: ${{ inputs.path }}/_freeze
-        key: quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
+        key: quarto-freezer-${{ runner.os }}-${{ hashFiles(format('{0}/renv.lock', inputs.path)) }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
         restore-keys: |
-          quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-
-          quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.base.ref }}-
-          quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-
+          quarto-freezer-${{ runner.os }}-${{ hashFiles(format('{0}/renv.lock', inputs.path)) }}-${{ github.event.pull_request.head.sha }}-
+          quarto-freezer-${{ runner.os }}-${{ hashFiles(format('{0}/renv.lock', inputs.path)) }}-${{ github.event.pull_request.base.ref }}-
+          quarto-freezer-${{ runner.os }}-${{ hashFiles(format('{0}/renv.lock', inputs.path)) }}-
           quarto-freezer-${{ runner.os }}-
 
     - name: Render pdf
@@ -185,7 +185,7 @@ runs:
       uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: ${{ inputs.path }}/_freeze
-        key: quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
+        key: quarto-freezer-${{ runner.os }}-${{ hashFiles(format('{0}/renv.lock', inputs.path)) }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
 
     - name: Stage site for upload
       if: github.event.action != 'closed'
