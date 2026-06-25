@@ -1,0 +1,31 @@
+# Copy to .github/workflows/update-snapshots.yml in your repo.
+#
+# One-time setup: Settings -> Actions -> General -> Workflow permissions ->
+# "Read and write permissions" (or use a PAT) so the job can push the
+# snapshot commit back to the branch.
+name: Update snapshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to update snapshots on
+        required: true
+        default: main
+
+jobs:
+  update-snapshots:
+    uses: d-morrison/gha/.github/workflows/update-snapshots.yml@v1
+    permissions:
+      contents: write
+    with:
+      ref: ${{ inputs.branch }}
+      # julia: true
+      # julia-version: '1'
+      # julia-project: inst/julia
+      # apt-packages: ''
+      # extra-packages: any::testthat
+      # needs: check
+      # commit-message: 'Update testthat snapshots [auto]'
+      # committer-name: github-actions[bot]
+      # committer-email: 41898282+github-actions[bot]@users.noreply.github.com
