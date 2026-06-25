@@ -102,6 +102,10 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
+      # Let the action install its github_ci MCP server so the reviewer can
+      # read CI/check-run status for the PR. Without actions: read it logs
+      # "Skipping CI server installation" and reviews blind to CI state.
+      actions: read
 
     steps:
       # A PR that changes the review workflow file itself can't be reviewed by
