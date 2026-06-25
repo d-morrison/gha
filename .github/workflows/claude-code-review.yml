@@ -82,6 +82,9 @@ jobs:
         github.event.sender.type != 'Bot'
       )
 
+    outputs:
+      quota_exhausted: ${{ steps.fail-check.outputs.quota_exhausted }}
+
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -331,7 +334,7 @@ jobs:
             num_turns="$(jq -r '.num_turns // 0' <<< "$result")"
             if [[ "$total_cost" == "0" && "$num_turns" == "1" ]]; then
               echo "quota_exhausted=true" >> "$GITHUB_OUTPUT"
-              echo "::warning::Claude review skipped — API quota or auth error (zero cost, turn 1). The check is marked as passed; re-trigger the review once the quota resets."
+              echo "::warning::Claude review skipped — CLAUDE_CODE_OAUTH_TOKEN quota or auth error (zero cost, turn 1). Re-trigger the review once the quota resets."
               exit 0
             fi
             echo "::error::Claude review ended in an error state (is_error=$is_error, subtype=$subtype)."
@@ -352,7 +355,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           gh pr comment "$PR_NUMBER" --repo "$REPO" --body "> [!WARNING]
-          > **Claude review skipped — API quota exhausted.** The review bot's API quota is currently exhausted. This check was skipped (not failed); re-trigger the review by pushing a new commit or re-running the workflow once the quota resets. [View run]($RUN_URL)"
+          > **Claude review skipped — API quota exhausted.** The \`CLAUDE_CODE_OAUTH_TOKEN\` account's API quota is exhausted. Re-trigger the review by pushing a new commit or re-running the workflow once the quota resets. [View run]($RUN_URL)"
 
       # In agent mode (workflow_dispatch), display_report writes Claude's output
       # to the GitHub Actions step summary — not to the PR. Tag mode
@@ -540,3 +543,36 @@ jobs:
           if [ "$ASSIGNEES" = "[]" ] && [ "$AI_USERS" = "[]" ]; then
             echo "No human assignees and no AI reviewers to restore; leaving reviewers cleared."
           fi
+
+  # Gate job: skipped (gray) when the claude-review job was itself skipped
+  # (fork/draft/bot) or when the API quota was exhausted. Passes on a clean
+  # review, fails when the review job failed for a real reason.
+  #
+  # GitHub Actions can only produce a "skipped" job conclusion via a false
+  # `if:` — a running job can only conclude success or failure. This second
+  # job is the mechanism: when quota_exhausted=true the `if:` is false and
+  # the job shows the gray skip icon instead of a misleading green checkmark.
+  #
+  # Consumers should use this job's name (e.g. `review / require-review`) in
+  # branch protection required-checks instead of (or in addition to)
+  # `review / claude-review`. A skipped result does not block merging; a
+  # failing result does.
+  require-review:
+    needs: claude-review
+    # Run when the claude-review job ran and quota was not exhausted.
+    # Skip (gray) when:
+    #   - claude-review was skipped (fork/draft/bot `if:` was false)
+    #   - quota_exhausted=true (API rejected the request before any work)
+    if: >-
+      always() &&
+      needs.claude-review.result != 'skipped' &&
+      !fromJSON(needs.claude-review.outputs.quota_exhausted || 'false')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert review succeeded
+        run: |
+          if [[ "${{ needs.claude-review.result }}" != "success" ]]; then
+            echo "::error::Claude review job did not succeed (result: ${{ needs.claude-review.result }})."
+            exit 1
+          fi
+          echo "Claude review completed."
