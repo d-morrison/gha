@@ -1,0 +1,36 @@
+---
+title: "summary.yml"
+---
+
+Post an AI summary comment on newly opened issues, using the GitHub models API.
+
+## Inputs
+
+This workflow takes no inputs.
+
+## Permissions
+
+Grant `issues: write`, `models: read`, and `contents: read`.
+
+## Example
+
+```yaml
+# Copy to .github/workflows/summary.yml in your repo.
+# NOTE: the calling job must grant issues:write + models:read.
+name: Summarize new issues
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  summary:
+    permissions:
+      issues: write
+      models: read
+      contents: read
+    uses: d-morrison/gha/.github/workflows/summary.yml@v1
+```
+
+See [`examples/summary.yml`](https://github.com/d-morrison/gha/blob/main/examples/summary.yml)
+for the full caller stub.

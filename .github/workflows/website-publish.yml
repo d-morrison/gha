@@ -22,5 +22,7 @@ jobs:
       pages: write
       id-token: write
     uses: d-morrison/gha/.github/workflows/quarto-publish.yml@v1
-    # The site is pure markdown at the repo root, so the defaults
-    # (path: '.', setup-r: false, output-dir: _site, deploy: true) are correct.
+    with:
+      # The Quarto project lives in website/; it is pure markdown, so the other
+      # defaults (setup-r: false, output-dir: _site, deploy: true) are correct.
+      path: website

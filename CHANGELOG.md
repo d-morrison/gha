@@ -13,6 +13,16 @@ below with migration steps.
 
 ### Added
 
+- Documentation website (#100) — a Quarto site under `website/` that documents
+  every reusable workflow (overview, a per-action reference page with full input
+  tables, permissions, and versioning). It is built and shipped by the repo's own
+  actions: `quarto-publish` deploys it to GitHub Pages on `main`, and the
+  `preview` family renders a per-PR preview.
+- `preview` gains a `path` input (#100) — the project directory to render
+  (the dir holding `_quarto.yml`), defaulting to the repo root. This brings
+  `preview` to parity with `quarto-publish` and lets a site that lives in a
+  subdirectory (like this repo's `website/`) get a PR preview. Backward
+  compatible: existing callers that render the repo root need no change.
 - Shared-content sync family (#57) — keeps guidance shared between repos current
   in both directions, via two reusable workflows and a shared helper:
   - `bump-submodule.yml` — update a named submodule to its upstream HEAD and open

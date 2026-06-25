@@ -7,6 +7,12 @@ description: >-
   base-repo context via workflow_run. The R-package / Quarto specifics are
   parameterized so non-rme consumers can reuse this.
 inputs:
+  path:
+    description: >-
+      Path (relative to the caller repo root) to the Quarto project to render:
+      the directory containing _quarto.yml. Defaults to the repo root. Set it
+      when the site lives in a subdirectory (matches quarto-publish's `path`).
+    default: '.'
   r-version:
     description: R version to install with r-lib/actions/setup-r.
     default: '4.6.0'
@@ -122,7 +128,7 @@ runs:
       if: github.event.action != 'closed' && !contains(github.event.pull_request.labels.*.name, 'clear freezer')
       uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
-        path: _freeze
+        path: ${{ inputs.path }}/_freeze
         key: quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
         restore-keys: |
           quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-
@@ -134,54 +140,62 @@ runs:
       if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:pdf')
       shell: bash
       env:
+        PROJECT_PATH: ${{ inputs.path }}
         RENDER_PROFILE: ${{ inputs.render-profile }}
-      run: quarto render --profile "$RENDER_PROFILE" --to pdf
+      run: quarto render "$PROJECT_PATH" --profile "$RENDER_PROFILE" --to pdf
 
     - name: Render docx
       if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:docx')
       shell: bash
       env:
+        PROJECT_PATH: ${{ inputs.path }}
         RENDER_PROFILE: ${{ inputs.render-profile }}
-      run: quarto render --profile "$RENDER_PROFILE" --to docx --no-clean
+      run: quarto render "$PROJECT_PATH" --profile "$RENDER_PROFILE" --to docx --no-clean
 
     - name: Render revealjs
       if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'preview:revealjs')
       shell: bash
       env:
+        PROJECT_PATH: ${{ inputs.path }}
         RENDER_PROFILE: ${{ inputs.render-profile }}
-      run: quarto render --profile "$RENDER_PROFILE" --to revealjs --no-clean
+      run: quarto render "$PROJECT_PATH" --profile "$RENDER_PROFILE" --to revealjs --no-clean
 
     - name: Render html
       if: github.event.action != 'closed'
       shell: bash
       env:
+        PROJECT_PATH: ${{ inputs.path }}
         RENDER_PROFILE: ${{ inputs.render-profile }}
-      run: quarto render --profile "$RENDER_PROFILE" --to html --no-clean
+      run: quarto render "$PROJECT_PATH" --profile "$RENDER_PROFILE" --to html --no-clean
 
     - name: List files
       if: github.event.action != 'closed'
       shell: bash
+      env:
+        PROJECT_PATH: ${{ inputs.path }}
       run: |
         set -euo pipefail
-        echo "contents of _site:"
-        ls _site/
-        echo "contents of .:"
-        ls .
+        echo "contents of $PROJECT_PATH/_site:"
+        ls "$PROJECT_PATH/_site/"
+        echo "contents of $PROJECT_PATH:"
+        ls "$PROJECT_PATH"
 
     - name: Save Quarto freeze
       if: github.event.action != 'closed'
       uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
-        path: _freeze
+        path: ${{ inputs.path }}/_freeze
         key: quarto-freezer-${{ runner.os }}-${{ hashFiles('renv.lock') }}-${{ github.event.pull_request.head.sha }}-${{ github.run_attempt }}
 
     - name: Stage site for upload
       if: github.event.action != 'closed'
       shell: bash
+      env:
+        PROJECT_PATH: ${{ inputs.path }}
       run: |
         set -euo pipefail
         mkdir -p _preview_upload/site/
-        cp -r _site/. _preview_upload/site/
+        cp -r "$PROJECT_PATH/_site/." _preview_upload/site/
 
     - name: Upload preview artifact
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

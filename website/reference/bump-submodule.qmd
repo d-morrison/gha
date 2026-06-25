@@ -1,0 +1,61 @@
+---
+title: "bump-submodule.yml"
+---
+
+Update a named submodule to its upstream HEAD and open a PR when the pointer moves.
+Used by the side that vendors another repo as a git submodule (for example the lab manual tracking `.ai-config`).
+
+## Inputs
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `submodule-path` | string | required | Path of the submodule to bump (for example `.ai-config`). |
+| `remote-branch` | string | `''` | Upstream branch to track. Empty follows the submodule's configured branch, or its remote default branch. |
+| `base-branch` | string | `main` | Base branch to open the PR against. |
+| `pr-branch` | string | `automated/bump-submodule` | Head branch for the automation PR. |
+
+## Secrets
+
+| Secret | Required | Description |
+|---|---|---|
+| `SUBMODULES_TOKEN` | no | Read access to a private submodule. |
+| `WORKFLOW_TOKEN` | no | PAT or App token; needed only to push to a protected branch. |
+
+## Permissions
+
+Grant `contents: write` and `pull-requests: write`,
+and enable Settings -> Actions -> General -> "Allow GitHub Actions to create and approve pull requests".
+
+## Example
+
+```yaml
+# Copy to .github/workflows/bump-submodule.yml in your repo.
+# Periodically bump a submodule to its upstream HEAD and open a PR when it moves.
+# Requires Settings -> Actions -> General -> "Allow GitHub Actions to create and
+# approve pull requests" (the integrated GITHUB_TOKEN opens the PR).
+name: Bump submodule
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1' # Weekly on Monday at 06:00 UTC
+
+jobs:
+  bump:
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: d-morrison/gha/.github/workflows/bump-submodule.yml@v1
+    with:
+      submodule-path: .ai-config
+      # remote-branch: main        # defaults to the submodule's configured branch
+    secrets:
+      # Needed only for private submodules; omit for public ones.
+      SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
+      # Set only if the bot must push to a protected branch; otherwise omit and
+      # the push falls back to GITHUB_TOKEN.
+      WORKFLOW_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
+```
+
+See [`examples/bump-submodule.yml`](https://github.com/d-morrison/gha/blob/main/examples/bump-submodule.yml)
+for the full caller stub.

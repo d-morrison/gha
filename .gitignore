@@ -4,7 +4,7 @@
 __pycache__/
 
 # Quarto website build outputs
-/_site/
-/.quarto/
+/website/_site/
+/website/.quarto/
 
 **/*.quarto_ipynb

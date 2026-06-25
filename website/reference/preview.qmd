@@ -1,0 +1,75 @@
+---
+title: "preview.yml"
+---
+
+The build half of the PR-preview family.
+Render the Quarto site read-only in the possibly-forked PR context
+and upload it plus PR metadata as the `pr-preview-site` artifact.
+The deploy half (`preview-deploy.yml`) publishes it to `gh-pages`.
+Keep this workflow's `name:` in sync with the `workflows:` list in the deploy stub.
+The R and renv machinery is parameterized so non-rme repos can reuse it;
+turn it off for a pure-markdown site.
+
+## Inputs
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `path` | string | `'.'` | Path in the caller repo to the Quarto project to render (the directory with `_quarto.yml`). Defaults to the repo root; set it for a subdirectory site (matches `quarto-publish`'s `path`). |
+| `r-version` | string | `'4.6.0'` | R version to install with `r-lib/actions/setup-r`. |
+| `apt-packages` | string | `(long; see workflow file)` | System apt packages to install before R/Quarto setup, space-separated. Defaults to the shared renv stack plus build helpers; set to an empty string to skip the apt step. |
+| `use-renv` | boolean | `true` | Restore R dependencies with renv. Set false for non-renv repos. |
+| `install-package` | boolean | `true` | Run `R CMD INSTALL .` to install the caller repo as a local package before rendering. |
+| `setup-chrome` | boolean | `true` | Install Chrome (needed by Quarto for revealjs and screenshot rendering). |
+| `submodules` | string | `'recursive'` | Passed to `actions/checkout` `submodules` (`'recursive'`, `'true'`, or `'false'`). |
+| `render-profile` | string | `'website'` | Quarto `--profile` to render with. |
+
+## Permissions
+
+Only `contents: read` (the default).
+The build half is read-only and must never write to the base repo.
+
+## Example
+
+```yaml
+# Copy to .github/workflows/preview.yml in your repo.
+# Build half of the PR-preview family: renders the Quarto site in the (possibly
+# fork) PR context and uploads it + PR metadata as an artifact. The deploy half
+# (preview-deploy.yml) publishes it to gh-pages. This job is read-only
+# (contents: read) --- it must never write to the base repo.
+#
+# IMPORTANT: keep this workflow's `name:` in sync with the `workflows:` list in
+# preview-deploy.yml --- that's how the deploy half finds this run.
+name: Quarto Preview Build
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, closed]
+    # Trim/extend these globs to the source paths that affect your rendered site.
+    paths:
+      - 'man/**'
+      - 'vignettes/**'
+      - '_extensions/**'
+      - '_quarto*.yml'
+      - '*.qmd'
+      - 'chapters/**/*.qmd'
+      - '_subfiles/**'
+      - '*.scss'
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    uses: d-morrison/gha/.github/workflows/preview.yml@v1
+    # with:
+    #   path: website                      # Quarto project lives in a subdir (default: repo root)
+    #   r-version: '4.6.0'
+    #   apt-packages: 'jags libglpk-dev'   # override the default system-deps list
+    #   use-renv: true                     # set false for non-renv repos
+    #   install-package: true              # `R CMD INSTALL .` before rendering
+    #   setup-chrome: true                 # needed for revealjs / screenshots
+    #   submodules: recursive
+    #   render-profile: website
+```
+
+See [`examples/preview.yml`](https://github.com/d-morrison/gha/blob/main/examples/preview.yml)
+for the full caller stub.

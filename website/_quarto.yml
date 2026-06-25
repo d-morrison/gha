@@ -1,11 +1,6 @@
 project:
   type: website
   output-dir: _site
-  # Render only the website's own pages. The repo's README, CHANGELOG, and
-  # other project docs are not site content, so this allowlist keeps them out
-  # of the rendered _site/.
-  render:
-    - "*.qmd"
 
 website:
   title: "d-morrison/gha"
@@ -14,6 +9,7 @@ website:
     R-package and Quarto repositories.
   site-url: "https://d-morrison.github.io/gha/"
   repo-url: "https://github.com/d-morrison/gha"
+  repo-subdir: website
   repo-actions: [issue, edit]
   page-navigation: true
   navbar:
@@ -30,6 +26,29 @@ website:
       - icon: github
         href: "https://github.com/d-morrison/gha"
         aria-label: "GitHub repository"
+  sidebar:
+    style: floating
+    contents:
+      - index.qmd
+      - workflows.qmd
+      - permissions.qmd
+      - versioning.qmd
+      - section: "Reference"
+        contents:
+          - reference/check-bibliography-dois.qmd
+          - reference/check-non-standard-chars.qmd
+          - reference/check-phi.qmd
+          - reference/check-links.qmd
+          - reference/check-news.qmd
+          - reference/summary.qmd
+          - reference/quarto-publish.qmd
+          - reference/preview.qmd
+          - reference/preview-deploy.qmd
+          - reference/cleanup-pr-previews.qmd
+          - reference/claude.qmd
+          - reference/claude-code-review.qmd
+          - reference/bump-submodule.qmd
+          - reference/sync-shared-fragments.qmd
 
 format:
   html:

@@ -1,0 +1,43 @@
+---
+title: "cleanup-pr-previews.yml"
+---
+
+The housekeeping half of the PR-preview family.
+On a schedule, it deletes `gh-pages` preview directories for pull requests that are no longer open.
+
+## Inputs
+
+| Input | Type | Default | Description |
+|---|---|---|---|
+| `preview-dir` | string | `'pr-preview'` | Directory on `gh-pages` that holds the per-PR preview subdirectories. |
+
+## Permissions
+
+Grant `contents: write` (commit the deletions to `gh-pages`) and `pull-requests: read`.
+
+## Example
+
+```yaml
+# Copy to .github/workflows/cleanup-pr-previews.yml in your repo.
+# Housekeeping half of the PR-preview family: periodically deletes gh-pages
+# preview directories for PRs that are no longer open. The calling job grants
+# contents:write so it can commit the deletions back to gh-pages.
+name: Clean up PR Previews
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0' # Weekly on Sunday at midnight UTC
+
+jobs:
+  cleanup:
+    permissions:
+      contents: write
+      pull-requests: read
+    uses: d-morrison/gha/.github/workflows/cleanup-pr-previews.yml@v1
+    # with:
+    #   preview-dir: pr-preview   # gh-pages dir holding the per-PR previews
+```
+
+See [`examples/cleanup-pr-previews.yml`](https://github.com/d-morrison/gha/blob/main/examples/cleanup-pr-previews.yml)
+for the full caller stub.

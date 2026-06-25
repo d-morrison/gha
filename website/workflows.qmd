@@ -4,24 +4,24 @@ title: "Workflows"
 
 Every capability is a reusable workflow you call with a small stub.
 The table below is the full catalog;
-the sections that follow group the workflows by purpose and link to a copy-paste example.
+each workflow links to its reference page, with full input tables and a copy-paste example.
 
 | Workflow | Purpose | Key inputs |
 |---|---|---|
-| `check-bibliography-dois.yml` | Validate book/article BibTeX entries have resolvable DOIs matching CrossRef metadata | `exclude-keys`, `install-quarto`, `no-metadata-check` |
-| `check-non-standard-chars.yml` | Detect curly quotes and en/em dashes in `.qmd` and `.R` files | `python-version` |
-| `check-phi.yml` | Scan PRs (added lines only) for content that looks like PHI | `detectors`, `paths-ignore`, `allowlist-file`, `fail` |
-| `check-links.yml` | lychee link check with bundled config, PR skip-label, and auto-issue on `main` | `lychee-config`, `lychee-args`, `fail-if-empty`, `create-issue-on-main`, `skip-label` |
-| `check-news.yml` | Enforce a `NEWS.md` changelog entry on PRs | `changelog` |
-| `summary.yml` | AI summary comment on newly opened issues | -- |
-| `quarto-publish.yml` | Render a Quarto site and deploy it to GitHub Pages | `path`, `setup-r`, `r-packages`, `use-renv`, `tinytex`, `output-dir`, `checkout-submodules`, `deploy` |
-| `preview.yml` | Build half of the PR-preview family: render in the PR context and upload an artifact (read-only) | `r-version`, `apt-packages`, `use-renv`, `install-package`, `setup-chrome`, `submodules`, `render-profile` |
-| `preview-deploy.yml` | Deploy half: publish the artifact to `gh-pages` and comment the preview link | -- |
-| `cleanup-pr-previews.yml` | Housekeeping: delete preview directories for closed PRs | `preview-dir` |
-| `claude.yml` | Agent-mode Claude Code bot: responds to `@claude`, edits files, opens/updates PRs | `setup-r`, `install-quarto`, `use-renv`, `checkout-submodules`, `reviewer` |
-| `claude-code-review.yml` | Read-only Claude PR review | `pr-number`, `prompt-addendum`, `checkout-submodules`, `allowed-bots` |
-| `bump-submodule.yml` | Update a submodule to upstream HEAD and open a PR when the pointer moves | `submodule-path`, `remote-branch`, `base-branch`, `pr-branch` |
-| `sync-shared-fragments.yml` | Vendor files from an upstream repo (pinned to a commit) and open a PR when they change | `source-repo`, `source-ref`, `source-paths`, `dest-dir`, `manifest-path` |
+| [`check-bibliography-dois.yml`](reference/check-bibliography-dois.qmd) | Validate book/article BibTeX entries have resolvable DOIs matching CrossRef metadata | `exclude-keys`, `install-quarto`, `no-metadata-check` |
+| [`check-non-standard-chars.yml`](reference/check-non-standard-chars.qmd) | Detect curly quotes and en/em dashes in `.qmd` and `.R` files | `python-version` |
+| [`check-phi.yml`](reference/check-phi.qmd) | Scan PRs (added lines only) for content that looks like PHI | `detectors`, `paths-ignore`, `allowlist-file`, `fail` |
+| [`check-links.yml`](reference/check-links.qmd) | lychee link check with bundled config, PR skip-label, and auto-issue on `main` | `lychee-config`, `lychee-args`, `fail-if-empty`, `create-issue-on-main`, `skip-label` |
+| [`check-news.yml`](reference/check-news.qmd) | Enforce a `NEWS.md` changelog entry on PRs | `changelog` |
+| [`summary.yml`](reference/summary.qmd) | AI summary comment on newly opened issues | -- |
+| [`quarto-publish.yml`](reference/quarto-publish.qmd) | Render a Quarto site and deploy it to GitHub Pages | `path`, `setup-r`, `r-packages`, `use-renv`, `tinytex`, `output-dir`, `checkout-submodules`, `deploy` |
+| [`preview.yml`](reference/preview.qmd) | Build half of the PR-preview family: render in the PR context and upload an artifact (read-only) | `path`, `r-version`, `apt-packages`, `use-renv`, `install-package`, `setup-chrome`, `submodules`, `render-profile` |
+| [`preview-deploy.yml`](reference/preview-deploy.qmd) | Deploy half: publish the artifact to `gh-pages` and comment the preview link | -- |
+| [`cleanup-pr-previews.yml`](reference/cleanup-pr-previews.qmd) | Housekeeping: delete preview directories for closed PRs | `preview-dir` |
+| [`claude.yml`](reference/claude.qmd) | Agent-mode Claude Code bot: responds to `@claude`, edits files, opens/updates PRs | `setup-r`, `install-quarto`, `use-renv`, `checkout-submodules`, `reviewer` |
+| [`claude-code-review.yml`](reference/claude-code-review.qmd) | Read-only Claude PR review | `pr-number`, `prompt-addendum`, `checkout-submodules`, `allowed-bots` |
+| [`bump-submodule.yml`](reference/bump-submodule.qmd) | Update a submodule to upstream HEAD and open a PR when the pointer moves | `submodule-path`, `remote-branch`, `base-branch`, `pr-branch` |
+| [`sync-shared-fragments.yml`](reference/sync-shared-fragments.qmd) | Vendor files from an upstream repo (pinned to a commit) and open a PR when they change | `source-repo`, `source-ref`, `source-paths`, `dest-dir`, `manifest-path` |
 
 Pin every reference to `@v1`.
 The stubs in [`examples/`](https://github.com/d-morrison/gha/tree/main/examples)
