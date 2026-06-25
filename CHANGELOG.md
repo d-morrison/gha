@@ -46,9 +46,10 @@ below with migration steps.
   `clean-exclude: pr-preview/`, so a main-site deploy never wipes the preview
   family's per-PR sites; it also offers optional submodule init and a
   `pre-render-artifact` input so a caller can inject build-time assets (e.g.
-  recorded media) before render. Callers grant `contents: write` (drop to
-  `contents: read` with `deploy: false`) and set Pages Source = "Deploy from a
-  branch", branch `gh-pages`. First consumer: `Lacaedemon/sparta` (#37).
+  recorded media) before render. Callers grant `contents: write` (still
+  required with `deploy: false`, since the deploy job is part of the workflow)
+  and set Pages Source = "Deploy from a branch", branch `gh-pages`. First
+  consumer: `Lacaedemon/sparta` (#37).
 
   **Breaking change for early `@v1` adopters (#117).** An earlier interim
   version deployed via `actions/deploy-pages` and needed Pages Source =

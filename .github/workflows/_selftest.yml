@@ -106,9 +106,15 @@ jobs:
   # composite-only job above wouldn't. The deploy path is validated by
   # dogfooding (website-publish.yml) at release. Local ./ ref since the
   # branch-deploy change isn't at `@v1` yet.
+  #
+  # Grant contents: write even though deploy: false: a reusable workflow's job
+  # permissions are checked against the caller's grant at graph-build time
+  # regardless of `if:`, so the wrapper's contents:write deploy job requires the
+  # caller to grant write even when that job is skipped. The build job
+  # downscopes its own token to contents:read.
   publish-workflow:
     permissions:
-      contents: read
+      contents: write
     uses: ./.github/workflows/quarto-publish.yml
     with:
       path: website

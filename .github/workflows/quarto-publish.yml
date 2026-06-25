@@ -61,7 +61,7 @@ on:
         type: string
         default: ''
       deploy:
-        description: Deploy the rendered site to the gh-pages branch. Set false to render only (e.g. a build check).
+        description: Deploy the rendered site to the gh-pages branch. Set false to render only (e.g. a build check); the caller still grants contents:write, since the deploy job is part of the workflow.
         type: boolean
         default: true
     secrets:
@@ -70,10 +70,11 @@ on:
         required: false
 
 jobs:
-  # Render the site and stage it as an artifact. Held to contents:read with no
-  # write access, so a render-only caller (deploy: false) can cap its grant to
-  # contents:read — the deploy job below is skipped, and a skipped job's
-  # higher permission request is never checked against the caller's grant.
+  # Render the site and stage it as an artifact. Held to contents:read so the
+  # render step never has write access — even though the caller grants
+  # contents:write (a reusable workflow's caller must grant write because the
+  # deploy job below declares it, even when deploy is false). Only the deploy
+  # job actually uses the write token.
   build:
     runs-on: ubuntu-latest
     permissions:

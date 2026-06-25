@@ -69,8 +69,9 @@ that need to write must have the **caller** grant it on the calling job:
   `contents: read` (the default), so no `permissions:` block is needed.
 - `quarto-publish` (deploys to the `gh-pages` branch, which Pages serves) →
   grant `contents: write`, and set Settings → Pages → Source = "Deploy from a
-  branch", branch `gh-pages` / `(root)` once. Render-only callers
-  (`deploy: false`) need just `contents: read`.
+  branch", branch `gh-pages` / `(root)` once. Grant `contents: write` even with
+  `deploy: false` — the deploy job is part of the workflow, so the caller must
+  grant its permissions even when it is skipped.
 - `claude` (pushes branches, opens PRs, dispatches the review workflow) → grant
   `contents: write`, `pull-requests: write`, `issues: write`, `id-token: write`,
   `actions: write`, and add the `CLAUDE_CODE_OAUTH_TOKEN` secret.
