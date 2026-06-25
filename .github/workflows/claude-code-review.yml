@@ -292,7 +292,15 @@ jobs:
       # 'success'); if the action step itself failed, the job is already red.
       # Falls back to the well-known temp path when the action doesn't expose
       # the execution_file output on the pinned version.
+      #
+      # Special case: when total_cost_usd==0 and num_turns==1, the API rejected
+      # the request before Claude did any work (quota exhaustion, auth failure,
+      # or similar pre-processing rejection). Failing the check in this case is
+      # wrong — the PR hasn't been reviewed, but it also hasn't been found to
+      # have problems. Skip gracefully instead and post a comment so the author
+      # knows to re-trigger once the quota resets.
       - name: Fail the check if the review did not complete
+        id: fail-check
         if: steps.claude-review.outcome == 'success'
         shell: bash
         env:
@@ -316,11 +324,35 @@ jobs:
           is_error="$(jq -r '.is_error // false' <<< "$result")"
           subtype="$(jq -r '.subtype // ""' <<< "$result")"
           if [[ "$is_error" == "true" || "$subtype" == error_* ]]; then
+            # total_cost_usd==0 with num_turns==1 means the API rejected the
+            # request before any real processing — quota exhaustion, auth
+            # failure, or an immediate network error. Skip gracefully.
+            total_cost="$(jq -r '.total_cost_usd // 1' <<< "$result")"
+            num_turns="$(jq -r '.num_turns // 0' <<< "$result")"
+            if [[ "$total_cost" == "0" && "$num_turns" == "1" ]]; then
+              echo "quota_exhausted=true" >> "$GITHUB_OUTPUT"
+              echo "::warning::Claude review skipped — API quota or auth error (zero cost, turn 1). The check is marked as passed; re-trigger the review once the quota resets."
+              exit 0
+            fi
             echo "::error::Claude review ended in an error state (is_error=$is_error, subtype=$subtype)."
-            jq '{subtype, is_error, num_turns, duration_ms, permission_denials_count}' <<< "$result" || true
+            jq '{subtype, is_error, num_turns, duration_ms, total_cost_usd, permission_denials_count}' <<< "$result" || true
             exit 1
           fi
           echo "Claude review completed cleanly (subtype=$subtype)."
+
+      # When the API rejected the request before Claude could review (quota
+      # exhaustion, auth failure, etc.), post a notice so the PR author knows
+      # why the review didn't run and how to re-trigger it.
+      - name: Post quota-exhausted comment
+        if: steps.fail-check.outputs.quota_exhausted == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr-number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "> [!WARNING]
+          > **Claude review skipped — API quota exhausted.** The review bot's API quota is currently exhausted. This check was skipped (not failed); re-trigger the review by pushing a new commit or re-running the workflow once the quota resets. [View run]($RUN_URL)"
 
       # In agent mode (workflow_dispatch), display_report writes Claude's output
       # to the GitHub Actions step summary — not to the PR. Tag mode
@@ -330,6 +362,7 @@ jobs:
       - name: Post review comment for dispatched run
         if: >-
           steps.claude-review.outcome == 'success' &&
+          steps.fail-check.outputs.quota_exhausted != 'true' &&
           github.event_name == 'workflow_dispatch' &&
           inputs.pr-number != ''
         env:
@@ -375,7 +408,9 @@ jobs:
       # dispatched runs always leave a comment with an `actions/runs/<id>` link,
       # so this collapse step can match and fold it in future rounds.
       - name: Collapse previous Claude review comments
-        if: steps.claude-review.outcome == 'success'
+        if: >-
+          steps.claude-review.outcome == 'success' &&
+          steps.fail-check.outputs.quota_exhausted != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
