@@ -407,14 +407,19 @@ jobs:
           fi
           # Include the run URL so the collapse step can match this comment by
           # run ID (same regex: `actions/runs/<id>` in the body).
-          # Use printf to keep `---` off column 0: a bare `---` on its own
-          # line at column 0 in a YAML run block is treated as a document
-          # separator by both PyYAML and GitHub Actions' parser, truncating
-          # the script mid-string and producing "unexpected EOF" on the runner.
-          BODY=$(printf '%s\n\n---\n\n%s' \
+          # Write the body to a file and post it with --body-file so the review
+          # text — which can contain backticks, $(...), quotes, or a leading
+          # `---` — is never re-parsed by the shell as it would be if inlined as
+          # a --body argument. printf assembles the file at runtime, which also
+          # keeps the `---` separator off column 0: a bare `---` on its own line
+          # at column 0 in a YAML run block is read as a document separator by
+          # both PyYAML and GitHub Actions' parser, truncating the script
+          # mid-string and producing "unexpected EOF" on the runner.
+          BODY_FILE="$(mktemp)"
+          printf '%s\n\n---\n\n%s' \
             "**Claude finished review** — [View run]($RUN_URL)" \
-            "$REVIEW")
-          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$BODY"
+            "$REVIEW" > "$BODY_FILE"
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body-file "$BODY_FILE"
 
       # With sticky disabled, every run leaves its own review comment. Collapse
       # the older ones (minimize as OUTDATED) so the PR shows one expanded,
