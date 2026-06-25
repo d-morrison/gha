@@ -1,42 +1,42 @@
 # Copy to .github/workflows/quarto-publish.yml in your repo.
 #
-# Renders a Quarto site and deploys it to GitHub Pages. The calling job must
-# grant pages:write and id-token:write (repos default to a read-only token).
+# Renders a Quarto site and deploys it to the gh-pages branch (which GitHub
+# Pages serves). The calling job must grant contents: write so the deploy step
+# can push to gh-pages (repos default to a read-only token).
 #
 # One-time repo setup: Settings -> Pages -> Build and deployment -> Source =
-# "GitHub Actions". Until then the deploy step fails with a clear message.
+# "Deploy from a branch", branch `gh-pages` / `(root)`.
 name: Quarto Publish
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
-  # For a build-only PR preview (deploy: false below), also add:
+  # For a render-only build check (deploy: false below), also add:
   # pull_request:
 
-# Let an in-flight Pages deploy finish rather than cancelling it.
+# Serialize deploys so two pushes don't race on the gh-pages branch.
 concurrency:
-  group: pages
+  group: gh-pages
   cancel-in-progress: false
 
 jobs:
   publish:
     permissions:
-      contents: read
-      # pages/id-token are used only by the deploy step:
-      pages: write      # omit when deploy: false
-      id-token: write   # omit when deploy: false
+      # Push the rendered site to gh-pages. Cap this to contents: read when
+      # deploy: false (render only), since the push step is then skipped.
+      contents: write
     uses: d-morrison/gha/.github/workflows/quarto-publish.yml@v1
     # with:
     #   path: website          # Quarto project lives in a subdir (default: repo root)
     #   setup-r: true           # for R/knitr Quarto projects (default: false)
     #   use-renv: true          # restore R deps with renv instead of r-packages
     #   tinytex: true           # needed to render PDF outputs
-    #   output-dir: docs        # render+stage to a dir other than the default _site (overrides _quarto.yml)
+    #   output-dir: docs        # render to a dir other than the default _site (overrides _quarto.yml)
     #   checkout-submodules: true
     #   pre-render-artifact: demo-media       # inject a prior job's artifact before render
     #   pre-render-artifact-path: website/media
-    #   deploy: false           # build only (e.g. a PR preview); skips the Pages deploy job,
-    #                           # so the run needs only contents:read and no github-pages environment
+    #   deploy: false           # render only (e.g. a build check); skips the gh-pages push,
+    #                           # so the run needs only contents: read
     # secrets:
     #   SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}

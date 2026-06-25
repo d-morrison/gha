@@ -38,13 +38,26 @@ below with migration steps.
     reuse: commits staged changes to a reused automation branch and opens or
     updates the PR, no-op when nothing changed. First consumers:
     `UCD-SERG/lab-manual` and `d-morrison/ai-config`.
-- `quarto-publish` — render a Quarto site and deploy it to GitHub Pages. A
-  composite (`quarto-publish/action.yml`) sets up Quarto (optionally R/renv and
-  TinyTeX), renders a project at a given `path`, and stages the rendered output
-  (`<path>/<output-dir>`, default `_site`) as a Pages artifact. The reusable
-  workflow (`quarto-publish.yml`) adds the deploy, optional submodule init, and
-  a `pre-render-artifact` input so a caller can inject build-time assets (e.g.
-  recorded media) before render. First consumer: `Lacaedemon/sparta` (#37).
+- `quarto-publish` — render a Quarto site and deploy it to the `gh-pages`
+  branch, which GitHub Pages serves. A composite (`quarto-publish/action.yml`)
+  sets up Quarto (optionally R/renv and TinyTeX) and renders a project at a
+  given `path` into `<path>/<output-dir>` (default `_site`). The reusable
+  workflow (`quarto-publish.yml`) deploys that output to `gh-pages` with
+  `clean-exclude: pr-preview/`, so a main-site deploy never wipes the preview
+  family's per-PR sites; it also offers optional submodule init and a
+  `pre-render-artifact` input so a caller can inject build-time assets (e.g.
+  recorded media) before render. Callers grant `contents: write` (drop to
+  `contents: read` with `deploy: false`) and set Pages Source = "Deploy from a
+  branch", branch `gh-pages`. First consumer: `Lacaedemon/sparta` (#37).
+
+  **Breaking change for early `@v1` adopters (#117).** An earlier interim
+  version deployed via `actions/deploy-pages` and needed Pages Source =
+  "GitHub Actions". That is incompatible with the PR-preview family, which is
+  branch-based, so previews 404'd. Switching `quarto-publish` to a `gh-pages`
+  deploy makes publish and preview consistent. To migrate: (1) set Settings ->
+  Pages -> Source = "Deploy from a branch", branch `gh-pages` / `(root)`; and
+  (2) change the caller's job permissions from `pages: write` + `id-token:
+  write` to `contents: write` (see `examples/quarto-publish.yml`).
 - PR-preview / publish family (#33) — centralizes the three-workflow preview
   pipeline rme carried inline:
   - `preview` composite action + `preview.yml` reusable workflow — build half;
