@@ -1,0 +1,38 @@
+project:
+  type: website
+  output-dir: _site
+  # Render only the website's own pages. The repo's README, CHANGELOG, and
+  # other project docs are not site content, so this allowlist keeps them out
+  # of the rendered _site/.
+  render:
+    - "*.qmd"
+
+website:
+  title: "d-morrison/gha"
+  description: >-
+    Central, reusable GitHub Actions for d-morrison / UCD-SERG / ucdavis
+    R-package and Quarto repositories.
+  site-url: "https://d-morrison.github.io/gha/"
+  repo-url: "https://github.com/d-morrison/gha"
+  repo-actions: [issue, edit]
+  page-navigation: true
+  navbar:
+    left:
+      - text: "Overview"
+        href: index.qmd
+      - text: "Workflows"
+        href: workflows.qmd
+      - text: "Permissions"
+        href: permissions.qmd
+      - text: "Versioning"
+        href: versioning.qmd
+    right:
+      - icon: github
+        href: "https://github.com/d-morrison/gha"
+        aria-label: "GitHub repository"
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    code-copy: true

@@ -1,0 +1,30 @@
+# Build half of the PR-preview family for this repo's documentation site.
+# Renders the site read-only in the PR context and uploads it + PR metadata as
+# an artifact; website-preview-deploy.yml publishes it to gh-pages.
+#
+# IMPORTANT: keep this workflow's `name:` in sync with the `workflows:` list in
+# website-preview-deploy.yml -- that is how the deploy half finds this run.
+name: Website Preview Build
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, closed]
+    paths:
+      - '_quarto.yml'
+      - '_quarto-*.yml'
+      - '*.qmd'
+      - '*.scss'
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    uses: d-morrison/gha/.github/workflows/preview.yml@v1
+    # This site is pure markdown, not an R package, so turn off the R/renv
+    # machinery the preview family defaults on for rme-style consumers.
+    with:
+      use-renv: false
+      install-package: false
+      setup-chrome: false
+      submodules: 'false'
+      apt-packages: ''

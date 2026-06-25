@@ -1,0 +1,26 @@
+# Publish this repo's Quarto documentation site to GitHub Pages on `main`.
+# Dogfoods the reusable quarto-publish workflow exactly as a consumer would.
+#
+# One-time repo setup: Settings -> Pages -> Build and deployment -> Source =
+# "GitHub Actions". Until then the deploy step fails with a clear message.
+name: Quarto Publish (website)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Let an in-flight Pages deploy finish rather than cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: d-morrison/gha/.github/workflows/quarto-publish.yml@v1
+    # The site is pure markdown at the repo root, so the defaults
+    # (path: '.', setup-r: false, output-dir: _site, deploy: true) are correct.

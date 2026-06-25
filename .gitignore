@@ -2,3 +2,9 @@
 *.Rproj.user
 .Rhistory
 __pycache__/
+
+# Quarto website build outputs
+/_site/
+/.quarto/
+
+**/*.quarto_ipynb

@@ -1,0 +1,55 @@
+---
+title: "Permissions"
+---
+
+A called reusable workflow cannot hold more `GITHUB_TOKEN` permissions than the
+caller grants, and most repos default to a **read-only** token.
+So workflows that need to write must have the **caller** grant it on the calling job.
+The stubs in [`examples/`](https://github.com/d-morrison/gha/tree/main/examples)
+already include the right `permissions:` blocks; copy them as-is.
+
+## Per-workflow grants
+
+- `check-bibliography-dois`, `check-non-standard-chars`, `check-phi`
+  need only `contents: read` (the default), so no `permissions:` block is needed.
+- `check-links` opens an issue on `main` failures, so grant
+  `issues: write`, `pull-requests: read`, `contents: read`.
+- `summary` comments on issues and calls the models API, so grant
+  `issues: write`, `models: read`, `contents: read`.
+- `quarto-publish` deploys to GitHub Pages, so grant
+  `pages: write`, `id-token: write`, `contents: read`,
+  and set Settings -> Pages -> Source to "GitHub Actions" once.
+  Build-only callers (`deploy: false`) need just `contents: read`.
+- `preview` (build half, read-only) needs only `contents: read` (the default).
+- `preview-deploy` (deploy half) pushes `gh-pages` and comments, so grant
+  `contents: write`, `pull-requests: write`, `actions: read`.
+- `cleanup-pr-previews` commits deletions to `gh-pages`, so grant
+  `contents: write`, `pull-requests: read`.
+- `bump-submodule`, `sync-shared-fragments` open a PR, so grant
+  `contents: write`, `pull-requests: write`,
+  and enable Settings -> Actions -> General -> "Allow GitHub Actions to create and approve pull requests".
+- `claude` pushes branches, opens PRs, and dispatches the review workflow, so grant
+  `contents: write`, `pull-requests: write`, `issues: write`,
+  `id-token: write`, `actions: write`, and add the `CLAUDE_CODE_OAUTH_TOKEN` secret.
+- `claude-code-review` (read-only review) grants
+  `contents: read`, `pull-requests: write`, `issues: write`, `id-token: write`,
+  and the `CLAUDE_CODE_OAUTH_TOKEN` secret.
+
+## Optional secrets
+
+- **`WORKFLOW_TOKEN`** (a PAT or GitHub App token with `contents:write` + `workflows:write`).
+  The integrated `GITHUB_TOKEN` cannot push changes to files under `.github/workflows/`;
+  GitHub rejects them without the `workflows` scope.
+  Add this secret if `claude` will edit workflow files, or to push to a protected branch.
+  Unlike `GITHUB_TOKEN`, a PAT or App-token push **does** trigger other `push`-based workflows,
+  so enabling it can set off extra CI runs.
+- **`SUBMODULES_TOKEN`.**
+  Public submodules clone anonymously; private ones need this secret.
+  Relevant to `claude`, `claude-code-review`, and `bump-submodule`
+  when `checkout-submodules` (or the submodule update) touches a private submodule.
+
+## Notes for private consumers
+
+Reusable workflows in this public repo are callable from public repos automatically.
+A **private** consumer must allow access to this repo under
+Settings -> Actions -> General -> Access before it can call these workflows.
