@@ -42,6 +42,17 @@ on:
           if you loosen that gate to review bot-authored pushes directly.
         type: string
         default: 'github-actions[bot]'
+      show-full-output:
+        description: >-
+          Show the full JSON output from Claude Code (passed through to
+          claude-code-action's show_full_output). Off by default. Turn it on to
+          diagnose a review that fails inside the model call: the action
+          otherwise hides the SDK output ("full output hidden for security"), so
+          an auth / usage-limit / credit rejection — which surfaces as a
+          0-cost, single-turn result with is_error:true — is unreadable from the
+          failing check alone.
+        type: boolean
+        default: false
     secrets:
       # `required: false` so callers don't hard-fail at the call gate on
       # fork `pull_request` events, where secrets are unavailable: GitHub
@@ -270,6 +281,12 @@ jobs:
           # activity; the collapse step below folds priors up as OUTDATED.
           use_sticky_comment: 'false'
           display_report: 'true'
+          # Surface the full SDK output when the caller opts in (show-full-output
+          # input, default false), so a review that fails inside the model call
+          # — auth / usage-limit / credit, which the action otherwise hides
+          # behind "full output hidden for security" — is diagnosable from the
+          # job log instead of opaque.
+          show_full_output: ${{ inputs.show-full-output }}
           # Permit bot actors to initiate this run (default github-actions[bot],
           # overridable via the allowed-bots input). claude.yml re-dispatches a
           # review after an @claude run pushes commits, and `gh workflow run`
