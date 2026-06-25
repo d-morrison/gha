@@ -175,9 +175,10 @@ jobs:
           REVIEWERS_JSON=$(gh api "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers")
           USERS=$(echo "$REVIEWERS_JSON" | jq -c '[.users[].login]')
           TEAMS=$(echo "$REVIEWERS_JSON" | jq -c '[.teams[].slug]')
-          # Capture AI reviewers (bot-type users, e.g. Copilot) separately. The
-          # commit path of the re-assign step routes human re-requests through
-          # assignees and would otherwise drop these; this lets it put them back.
+          # Capture AI reviewers (bot-type users, e.g. Copilot) separately so
+          # the commit path can restore them best-effort — a bad bot login
+          # shouldn't drop human reviewer re-requests. Human reviewers are
+          # derived from USERS_BEFORE minus AI_USERS_BEFORE.
           # (`user.type` is always present in the REST user object.)
           AI_USERS=$(echo "$REVIEWERS_JSON" | jq -c '[.users[] | select(.type == "Bot") | .login]')
           echo "users=$USERS" >> "$GITHUB_OUTPUT"
