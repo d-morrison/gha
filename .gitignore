@@ -3,8 +3,6 @@
 .Rhistory
 __pycache__/
 
-# Quarto website build outputs
-/website/_site/
-/website/.quarto/
-
+# Quarto intermediates anywhere in the tree. Per-project build outputs
+# (website/_site/, website/.quarto/) are ignored by each project's own .gitignore.
 **/*.quarto_ipynb
