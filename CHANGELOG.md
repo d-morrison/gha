@@ -11,6 +11,20 @@ below with migration steps.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-06-25
+
+### Breaking
+
+- **`quarto-publish` now deploys to the `gh-pages` branch** instead of the
+  GitHub Pages artifact (#118, #120). Consumers must set Settings → Pages →
+  Source = "Deploy from a branch", branch `gh-pages` / `(root)`, and grant the
+  caller `contents: write` (dropping `pages: write` + `id-token: write`) — still
+  required with `deploy: false`. This makes `quarto-publish` compatible with the
+  branch-based PR-preview family, so a repo can ship both a main site and PR
+  previews. Full migration steps are in the `quarto-publish` entry under Added.
+  `@v1` stays frozen on the Pages-artifact deploy for consumers not ready to
+  migrate.
+
 ### Added
 
 - Dark mode for the documentation website (#114) — `website/_quarto.yml` now
