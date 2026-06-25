@@ -13,6 +13,9 @@ below with migration steps.
 
 ### Added
 
+- Dark mode for the documentation website (#114) — `website/_quarto.yml` now
+  pairs the `cosmo` light theme with the `darkly` dark theme, so the site renders
+  a light/dark toggle in the navbar and respects the reader's system preference.
 - Documentation website (#100) — a Quarto site under `website/` that documents
   every reusable workflow (overview, a per-action reference page with full input
   tables, permissions, and versioning). It is built and shipped by the repo's own
