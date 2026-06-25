@@ -659,7 +659,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a><span class="co">    #   pre-render-artifact: demo-media       # inject a prior job's artifact before render</span></span>
 <span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a><span class="co">    #   pre-render-artifact-path: website/media</span></span>
 <span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a><span class="co">    #   deploy: false           # render only (e.g. a build check); skips the gh-pages push</span></span>
-<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="co">    #                           # (still grant contents: write — the deploy job is declared)</span></span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a><span class="co">    #                           # (still grant contents: write; the deploy job is declared)</span></span>
 <span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="co">    # secrets:</span></span>
 <span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a><span class="co">    #   SUBMODULES_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <p>See <a href="https://github.com/d-morrison/gha/blob/main/examples/quarto-publish.yml"><code>examples/quarto-publish.yml</code></a> for the full caller stub.</p>
