@@ -8,7 +8,7 @@ it is just a named bundle of commands.
 
 A **reusable workflow** is a complete pipeline.
 It defines its own jobs, each with its own runner (`runs-on:`),
-permissions (`permissions:`), and steps (including checkout).
+permissions (`permissions:`), and steps.
 A consumer calls it as a job, not as a step.
 
 The structural difference in YAML:
