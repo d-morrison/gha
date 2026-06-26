@@ -2,7 +2,7 @@
 
 A **composite action** is a list of steps.
 It runs *inside* a job that already exists —
-the runner, permissions, and checkout are all set up before the action starts.
+the caller's runner and permissions are already in place.
 An action has no concept of jobs or triggers;
 it is just a named bundle of commands.
 
