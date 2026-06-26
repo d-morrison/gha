@@ -175,9 +175,10 @@ jobs:
           REVIEWERS_JSON=$(gh api "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers")
           USERS=$(echo "$REVIEWERS_JSON" | jq -c '[.users[].login]')
           TEAMS=$(echo "$REVIEWERS_JSON" | jq -c '[.teams[].slug]')
-          # Capture AI reviewers (bot-type users, e.g. Copilot) separately. The
-          # commit path of the re-assign step routes human re-requests through
-          # assignees and would otherwise drop these; this lets it put them back.
+          # Capture AI reviewers (bot-type users, e.g. Copilot) separately so
+          # the commit path can restore them best-effort — a bad bot login
+          # shouldn't drop human reviewer re-requests. Human reviewers are
+          # derived from USERS_BEFORE minus AI_USERS_BEFORE.
           # (`user.type` is always present in the REST user object.)
           AI_USERS=$(echo "$REVIEWERS_JSON" | jq -c '[.users[] | select(.type == "Bot") | .login]')
           echo "users=$USERS" >> "$GITHUB_OUTPUT"
@@ -541,24 +542,29 @@ jobs:
             exit 0
           fi
 
-          # Claude pushed commits. Re-request the PR's human assignees (bot
-          # assignees filtered out) so the people who own the PR see the new
-          # commits, AND put back any AI reviewers (e.g. Copilot) that were
-          # requested before the stash — clearing them was temporary, and a
-          # fresh commit is exactly when their re-review is wanted. These are
-          # two separate POSTs (POST adds to the requested set, it doesn't
-          # replace it): the human re-request fails loudly if it errors, while
-          # the AI re-request is best-effort so a bad bot login can't undo it.
-          ASSIGNEES=$(echo "$PR_JSON" | jq -c '[.assignees[] | select(.type == "User") | .login]')
-          if [ "$ASSIGNEES" != "[]" ]; then
-            echo "Re-requesting human assignees: $ASSIGNEES"
-            jq -n --argjson users "$ASSIGNEES" '{reviewers: $users}' \
+          # Claude pushed commits. Re-request the human reviewers that were
+          # stashed before the run — anyone originally requested who isn't a
+          # bot — AND put back any AI reviewers (e.g. Copilot). These are two
+          # separate POSTs (POST adds to the requested set, it doesn't replace
+          # it): the human re-request fails loudly if it errors, while the AI
+          # re-request is best-effort so a bad bot login can't undo it.
+          #
+          # Use USERS_BEFORE (minus AI_USERS_BEFORE) instead of the PR's
+          # current assignee list: a human reviewer who isn't a PR assignee
+          # would otherwise lose their review request on every commit push.
+          AI_USERS=${AI_USERS_BEFORE:-[]}
+          HUMAN_USERS=$(jq -cn \
+            --argjson all "${USERS_BEFORE:-[]}" \
+            --argjson bots "$AI_USERS" \
+            '[($all[]) | select(. as $u | ($bots | index($u)) == null)]')
+          if [ "$HUMAN_USERS" != "[]" ]; then
+            echo "Re-requesting human reviewers: $HUMAN_USERS"
+            jq -n --argjson users "$HUMAN_USERS" '{reviewers: $users}' \
               | gh api -X POST "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers" --input -
           else
-            echo "No human assignees to re-request."
+            echo "No human reviewers to re-request."
           fi
 
-          AI_USERS=${AI_USERS_BEFORE:-[]}
           if [ "$AI_USERS" != "[]" ]; then
             echo "Restoring AI reviewers: $AI_USERS"
             jq -n --argjson users "$AI_USERS" '{reviewers: $users}' \
@@ -566,8 +572,8 @@ jobs:
               || echo "::warning::Could not restore AI reviewers ($AI_USERS)."
           fi
 
-          if [ "$ASSIGNEES" = "[]" ] && [ "$AI_USERS" = "[]" ]; then
-            echo "No human assignees and no AI reviewers to restore; leaving reviewers cleared."
+          if [ "$HUMAN_USERS" = "[]" ] && [ "$AI_USERS" = "[]" ]; then
+            echo "No human reviewers and no AI reviewers to restore; leaving reviewers cleared."
           fi
 
   # Gate job: skipped (gray) when the claude-review job was itself skipped
