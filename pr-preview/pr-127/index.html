@@ -522,7 +522,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="actions-vs.-workflows" class="level2">
 <h2 class="anchored" data-anchor-id="actions-vs.-workflows">Actions vs.&nbsp;workflows</h2>
 <p>A <strong>composite action</strong> is a list of steps. It runs <em>inside</em> a job that already exists - the caller’s runner and permissions are already in place. An action has no concept of jobs or triggers; it is just a named bundle of commands.</p>
-<p>A <strong>reusable workflow</strong> is a complete pipeline. It defines its own jobs, each with its own runner (<code>runs-on:</code>), permissions (<code>permissions:</code>), and steps (including checkout). A consumer calls it as a job, not as a step.</p>
+<p>A <strong>reusable workflow</strong> is a complete pipeline. It defines its own jobs, each with its own runner (<code>runs-on:</code>), permissions (<code>permissions:</code>), and steps. A consumer calls it as a job, not as a step.</p>
 <p>The structural difference in YAML:</p>
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2"><pre class="sourceCode yaml code-with-copy"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Composite action - &lt;name&gt;/action.yml</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">name</span><span class="kw">:</span><span class="at"> My Action</span></span>
@@ -543,7 +543,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">permissions</span><span class="kw">:</span></span>
 <span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">contents</span><span class="kw">:</span><span class="at"> read</span></span>
 <span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">steps</span><span class="kw">:</span></span>
-<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/checkout@...</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">uses</span><span class="kw">:</span><span class="at"> actions/checkout@v4</span></span>
 <span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> </span><span class="fu">run</span><span class="kw">:</span><span class="at"> echo "hello"</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <table class="caption-top table">
 <colgroup>
@@ -560,7 +560,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </thead>
 <tbody>
 <tr class="odd">
-<td>Top-level keys</td>
+<td>Key top-level keys</td>
 <td><code>name</code>, <code>description</code>, <code>inputs</code>, <code>outputs</code>, <code>runs</code></td>
 <td><code>on</code>, <code>jobs</code></td>
 </tr>
