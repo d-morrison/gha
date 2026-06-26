@@ -544,10 +544,11 @@ jobs:
 
           # Claude pushed commits. Re-request the human reviewers that were
           # stashed before the run — anyone originally requested who isn't a
-          # bot — AND put back any AI reviewers (e.g. Copilot). These are two
-          # separate POSTs (POST adds to the requested set, it doesn't replace
-          # it): the human re-request fails loudly if it errors, while the AI
-          # re-request is best-effort so a bad bot login can't undo it.
+          # bot — AND put back any AI reviewers (e.g. Copilot) and team reviewers.
+          # These are separate POSTs (POST adds to the requested set, it doesn't
+          # replace it): the human re-request fails loudly if it errors; AI-user
+          # and team restores are best-effort so a bad login/slug can't undo the
+          # human re-request.
           #
           # Use USERS_BEFORE (minus AI_USERS_BEFORE) instead of the PR's
           # current assignee list: a human reviewer who isn't a PR assignee
@@ -572,8 +573,16 @@ jobs:
               || echo "::warning::Could not restore AI reviewers ($AI_USERS)."
           fi
 
-          if [ "$HUMAN_USERS" = "[]" ] && [ "$AI_USERS" = "[]" ]; then
-            echo "No human reviewers and no AI reviewers to restore; leaving reviewers cleared."
+          TEAMS=${TEAMS_BEFORE:-[]}
+          if [ "$TEAMS" != "[]" ]; then
+            echo "Restoring team reviewers: $TEAMS"
+            jq -n --argjson teams "$TEAMS" '{team_reviewers: $teams}' \
+              | gh api -X POST "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers" --input - \
+              || echo "::warning::Could not restore team reviewers ($TEAMS)."
+          fi
+
+          if [ "$HUMAN_USERS" = "[]" ] && [ "$AI_USERS" = "[]" ] && [ "$TEAMS" = "[]" ]; then
+            echo "No human reviewers, AI reviewers, or team reviewers to restore; leaving reviewers cleared."
           fi
 
   # Gate job: skipped (gray) when the claude-review job was itself skipped
