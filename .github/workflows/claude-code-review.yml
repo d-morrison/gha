@@ -575,7 +575,7 @@ jobs:
           TEAMS=${TEAMS_BEFORE:-[]}
           if [ "$TEAMS" != "[]" ]; then
             echo "Restoring team reviewers: $TEAMS"
-            jq -n --argjson teams "$TEAMS" '{"team_reviewers": $teams}' \
+            jq -n --argjson teams "$TEAMS" '{team_reviewers: $teams}' \
               | gh api -X POST "repos/$REPO/pulls/$PR_NUMBER/requested_reviewers" --input - \
               || echo "::warning::Could not restore team reviewers ($TEAMS)."
           fi
