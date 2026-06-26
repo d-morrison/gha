@@ -36,60 +36,6 @@ jobs:
 Pin to `@v1` (a moving major tag updated as fixes land). Do not reference
 `@main` from consumers.
 
-## Actions vs. workflows
-
-A **composite action** is a list of steps. It runs *inside* a job that already
-exists — the runner, permissions, and checkout are all set up before the action
-starts. An action has no concept of jobs or triggers; it is just a named bundle
-of commands.
-
-A **reusable workflow** is a complete pipeline. It defines its own jobs, each
-with its own runner (`runs-on:`), permissions (`permissions:`), and steps
-(including checkout). A consumer calls it as a job, not a step.
-
-The structural difference in YAML:
-
-```yaml
-# Composite action — <name>/action.yml
-name: My Action
-description: Does a thing
-inputs:
-  my-input:
-    description: ...
-runs:
-  using: composite
-  steps:
-    - run: echo "hello"
-      shell: bash   # required on every run: step in a composite
-```
-
-```yaml
-# Reusable workflow — .github/workflows/<name>.yml
-on: workflow_call
-jobs:
-  my-job:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@...
-      - run: echo "hello"
-```
-
-| | Composite action | Reusable workflow |
-|---|---|---|
-| Top-level keys | `name`, `description`, `inputs`, `outputs`, `runs` | `on`, `jobs` |
-| Jobs | No — only `steps` under `runs` | Yes — one or more `jobs` blocks |
-| `runs-on` | Absent — inherits the caller's runner | Per job |
-| `permissions` | Absent | Yes (caller must also grant them) |
-| Called from | Another job's `steps` (via `uses`) | Another workflow's `jobs` (via `uses`) |
-| `shell` on `run` steps | Required on every step | Optional (default shell applies) |
-
-Because an action cannot declare permissions or choose its runner, this repo
-uses the two-layer design: the composite action holds the real logic, and the
-reusable workflow wraps it to handle the runner, permissions, and checkout.
-Consumer repos reference only the workflow layer.
-
 ## Available reusable workflows
 
 | Workflow | Purpose | Key inputs |

@@ -41,6 +41,8 @@ jobs:
 Pin to `@v1`, a moving major tag updated as fixes land.
 Do not reference `@main` from consumers.
 
+{{< include _actions-vs-workflows.qmd >}}
+
 ## Where to go next
 
 - [Workflows](workflows.qmd) catalogs every reusable workflow and what it does.
