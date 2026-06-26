@@ -544,10 +544,11 @@ jobs:
 
           # Claude pushed commits. Re-request the human reviewers that were
           # stashed before the run — anyone originally requested who isn't a
-          # bot — AND put back any AI reviewers (e.g. Copilot). These are two
-          # separate POSTs (POST adds to the requested set, it doesn't replace
-          # it): the human re-request fails loudly if it errors, while the AI
-          # re-request is best-effort so a bad bot login can't undo it.
+          # bot — AND put back any AI reviewers (e.g. Copilot) and team reviewers.
+          # These are separate POSTs (POST adds to the requested set, it doesn't
+          # replace it): the human re-request fails loudly if it errors; AI-user
+          # and team restores are best-effort so a bad login/slug can't undo the
+          # human re-request.
           #
           # Use USERS_BEFORE (minus AI_USERS_BEFORE) instead of the PR's
           # current assignee list: a human reviewer who isn't a PR assignee
