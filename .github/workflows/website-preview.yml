@@ -12,7 +12,6 @@ on:
     types: [opened, reopened, synchronize, labeled, closed]
     paths:
       - 'website/**'
-      - 'preview/**'
       - '.github/workflows/website-preview.yml'
 
 jobs:
