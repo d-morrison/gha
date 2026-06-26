@@ -36,13 +36,13 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@...
+      - uses: actions/checkout@v4
       - run: echo "hello"
 ```
 
 |  | Composite action | Reusable workflow |
 |---|---|---|
-| Top-level keys | `name`, `description`, `inputs`, `outputs`, `runs` | `on`, `jobs` |
+| Key top-level keys | `name`, `description`, `inputs`, `outputs`, `runs` | `on`, `jobs` |
 | Jobs | No - only `steps` under `runs` | Yes - one or more `jobs` blocks |
 | `runs-on` | Absent - inherits the caller's runner | Per job |
 | `permissions` | Absent | Yes (caller must also grant them) |
