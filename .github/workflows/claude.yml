@@ -162,6 +162,8 @@ on:
       # trusted-author `if:` already gates who can trigger a run.
       CLAUDE_CODE_OAUTH_TOKEN:
         required: false
+      ANTHROPIC_API_KEY:
+        required: false
       SUBMODULES_TOKEN:
         required: false
       # PAT/App token with `contents:write` + `workflows:write`, needed only to
@@ -519,6 +521,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # Let Claude read CI results (check runs / job logs) on PRs.
           additional_permissions: |
             actions: read
