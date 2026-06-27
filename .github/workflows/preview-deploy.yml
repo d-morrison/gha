@@ -96,6 +96,31 @@ jobs:
           comment: false
           action: remove
 
+      # Delete any existing pr-preview sticky comment(s) so the fresh comment
+      # posted below lands at the BOTTOM of the conversation instead of being
+      # edited in place (where later review/CI comments bury it mid-thread).
+      # marocchino's own `recreate: true` is unreliable here: this job runs on
+      # `workflow_run`, and on long threads its "find previous comment" step
+      # misses the comment, so it edits in place (no bump) or leaves duplicates.
+      # Deleting explicitly via the API (paginated, keyed on the PR number) is
+      # deterministic regardless of thread length.
+      - name: Bump preview comment to the bottom (remove stale copies)
+        if: steps.meta.outputs.action == 'deploy' && steps.preview.outputs.deployment-action != 'none'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.meta.outputs.pr-number }}
+        run: |
+          set -euo pipefail
+          # marocchino tags its sticky comment with the hidden marker
+          # `<!-- Sticky Pull Request Comment<header> -->` (header: pr-preview).
+          gh api --paginate "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
+            --jq '.[] | select(.body != null and (.body | test("Sticky Pull Request Comment ?pr-preview"))) | .id' \
+          | while read -r id; do
+              [ -n "$id" ] && gh api -X DELETE "repos/${GH_REPO}/issues/comments/${id}"
+            done
+
       - name: Comment with preview link
         uses: marocchino/sticky-pull-request-comment@0ea0beb66eb9baf113663a64ec522f60e49231c0 # v3.0.4
         if: steps.meta.outputs.action == 'deploy' && steps.preview.outputs.deployment-action != 'none'
