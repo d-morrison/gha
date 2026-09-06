@@ -773,6 +773,9 @@ def check_workflow(
         ):
             path = root / rel
             if not path.is_file():
+                # A missing or renamed doc would otherwise skip every
+                # assertion about it without recording anything.
+                check(False, f"{rel} exists (grant-list parity target)")
                 continue
             blob = path.read_text(encoding="utf-8")
             m = re.search(pattern, blob)
@@ -783,22 +786,44 @@ def check_workflow(
                 message.replace("actions: read", "checks: read"),
             )
         ref = root / "website" / "reference" / "claude-code-review.qmd"
+        check(ref.is_file(), "website/reference/claude-code-review.qmd exists")
         if ref.is_file():
+            # Only `key: value` lines indented like the block's own entries
+            # may sit between `permissions:` and the grant, so a grant that
+            # merely appears somewhere later in the file does not count.
+            perm_block = r"permissions:\n(?:      [a-z-]+: [a-z-]+\n)*?      "
+            ref_blob = ref.read_text(encoding="utf-8")
             check(
-                re.search(
-                    r"permissions:\n(?:[^\n]*\n)*?      actions: read",
-                    ref.read_text(encoding="utf-8"),
-                )
-                is not None,
+                re.search(perm_block + r"actions: read\n", ref_blob) is not None,
                 "website/reference/claude-code-review.qmd Example grants actions: read",
             )
             check(
-                re.search(
-                    r"permissions:\n(?:[^\n]*\n)*?      checks: read",
-                    ref.read_text(encoding="utf-8"),
-                )
-                is not None,
+                re.search(perm_block + r"checks: read\n", ref_blob) is not None,
                 "website/reference/claude-code-review.qmd Example grants checks: read",
+            )
+        wf_doc = root / "website" / "workflows.qmd"
+        check(wf_doc.is_file(), "website/workflows.qmd exists")
+        if wf_doc.is_file():
+            check(
+                "`actions` / `checks: read`" in wf_doc.read_text(encoding="utf-8"),
+                "website/workflows.qmd model-scope list includes checks: read",
+            )
+        dogfood = root / ".github" / "workflows" / "claude-review.yml"
+        check(dogfood.is_file(), ".github/workflows/claude-review.yml exists")
+        if dogfood.is_file():
+            df = load_yaml(dogfood)
+            df_jobs = (df or {}).get("jobs") or {}
+            df_review = next(
+                (
+                    job for job in df_jobs.values()
+                    if isinstance(job, dict)
+                    and "claude-code-review.yml" in str(job.get("uses", ""))
+                ),
+                {},
+            )
+            check(
+                job_permissions(df_review).get("checks") == "read",
+                ".github/workflows/claude-review.yml caller grants checks: read",
             )
 
     if FAILURES:
