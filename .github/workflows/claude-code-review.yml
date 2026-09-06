@@ -13,8 +13,8 @@ name: Claude Code Review (reusable)
 # `claude-review` runs the model with contents: read (plus pull-requests:
 # read, issues: read, actions: read, and checks: read). It writes the review
 # to an artifact. `post-review` downloads that artifact and posts; it holds
-# pull-requests: write / issues: write / actions: read / checks: read and
-# does not invoke the model.
+# pull-requests: write / issues: write / actions: read and does not
+# invoke the model.
 # The deny list on the model job is then a guard rail against accidents,
 # not a security boundary. `id-token: write` is omitted: forwarding
 # github.token skips claude-code-action's OIDC App-token exchange
@@ -1467,7 +1467,6 @@ jobs:
       pull-requests: write
       issues: write
       actions: read
-      checks: read
     outputs:
       stale: ${{ steps.target.outputs.stale }}
       clean_verdict: ${{ steps.classify-verdict.outputs.clean }}

@@ -172,10 +172,11 @@ that need to write must have the **caller** grant it on the calling job:
   `actions: read` is required on the caller: a `permissions:` block sets
   unspecified scopes to none, and `post-review` needs it to download the
   packed artifact (the model job also uses it for the `github_ci` MCP
-  server). `checks: read` is required for the same reason: `actions: read`
-  covers workflow runs but not `GET .../commits/{ref}/check-runs`, and
-  without it the reviewer's check-status reads fail with HTTP 403 and a
-  clean diff can be reported as blocked (ucdavis/bcs#964).
+  server).
+  `checks: read` is required too:
+  `actions: read` covers workflow runs but not `GET .../commits/{ref}/check-runs`,
+  so without it the reviewer's check-status reads fail with HTTP 403
+  and a clean diff can be reported as blocked (ucdavis/bcs#964).
 
   - **Optional:** set `checkout-submodules: true` so the reviewer can read
     submodule contents instead of reporting them as uninitialized. Public
