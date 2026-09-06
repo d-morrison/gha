@@ -78,7 +78,8 @@ already include the right `permissions:` blocks; copy them as-is.
   packed artifact (the model job also uses it for the `github_ci` MCP
   server).
   `checks: read` is required too:
-  `actions: read` covers workflow runs but not `GET .../commits/{ref}/check-runs`,
+  `actions: read` covers workflow runs
+  but not `GET .../commits/{ref}/check-runs`,
   so without it the reviewer's check-status reads fail with HTTP 403
   and a clean diff can be reported as blocked (ucdavis/bcs#964).
 - `cursor-code-review` queues a Cursor Bugbot review.

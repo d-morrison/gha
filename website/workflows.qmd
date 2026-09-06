@@ -338,7 +338,8 @@ The two Claude workflows are a pair.
   packed artifact, and a `permissions:` block sets unspecified scopes to
   none.
   The caller also grants `checks: read`,
-  which `GET .../commits/{ref}/check-runs` needs and `actions: read` does not cover (gha#829).
+  which `GET .../commits/{ref}/check-runs` needs
+  and `actions: read` does not cover (gha#829).
 
 An `@claude review` mention (or any commit Claude pushes) routes through
 `claude.yml`, which dispatches `claude-code-review.yml` via `workflow_dispatch`.
