@@ -161,10 +161,10 @@ that need to write must have the **caller** grant it on the calling job:
     contents. Public submodules clone anonymously; private ones additionally need
     a `SUBMODULES_TOKEN` secret.
 - `claude-code-review` (read-only review) → grant `contents: read`,
-  `pull-requests: write`, `issues: write`, `actions: read`, and either the
-  `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` secret.
+  `pull-requests: write`, `issues: write`, `actions: read`, `checks: read`,
+  and either the `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` secret.
   The model job's `GITHUB_TOKEN` has no write scopes
-  (`contents` / `pull-requests` / `issues` / `actions: read`);
+  (`contents` / `pull-requests` / `issues` / `actions` / `checks: read`);
   write is confined to jobs that never run the model
   (`gather-context` stashes reviewers and posts
   the early dispatch notice; `post-review` downloads the review artifact
@@ -173,6 +173,10 @@ that need to write must have the **caller** grant it on the calling job:
   unspecified scopes to none, and `post-review` needs it to download the
   packed artifact (the model job also uses it for the `github_ci` MCP
   server).
+  `checks: read` is required too:
+  `actions: read` covers workflow runs but not `GET .../commits/{ref}/check-runs`,
+  so without it the reviewer's check-status reads fail with HTTP 403
+  and a clean diff can be reported as blocked (ucdavis/bcs#964).
 
   - **Optional:** set `checkout-submodules: true` so the reviewer can read
     submodule contents instead of reporting them as uninitialized. Public

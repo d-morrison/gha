@@ -26,7 +26,9 @@ the facts a future edit could reverse silently:
 6. The gha#543 failure notice still posts when the packed artifact is
    missing (`download.outcome != 'success'` on a finished review).
 7. Caller grant lists include `actions: read` (a `permissions:` block
-   sets unspecified scopes to none; without it `download-artifact` 403s).
+   sets unspecified scopes to none; without it `download-artifact` 403s)
+   and `checks: read` (the model job's check-run reads 403 without it,
+   gha#829), and the model job itself requests `checks: read`.
 8. Every `steps.fail-check*.outputs.<name>` the workflow reads is declared
    in run-review-guard/action.yml. A composite's step outputs are
    invisible to its caller unless re-declared, and gha#804's first draft
@@ -166,6 +168,11 @@ def check_workflow(
         review_perms.get("id-token") != "write",
         "claude-review does not grant id-token: write "
         "(App-token exchange is skipped; its defaults are write)",
+    )
+    check(
+        review_perms.get("checks") == "read",
+        "claude-review grants checks: read "
+        "(GET .../commits/{ref}/check-runs 403s without it, gha#829)",
     )
     check(
         post_perms.get("pull-requests") == "write",
@@ -738,6 +745,11 @@ def check_workflow(
                 "examples/claude-code-review.yml grants actions: read "
                 "(caller token; unspecified scopes are none)",
             )
+            check(
+                job_permissions(review_job).get("checks") == "read",
+                "examples/claude-code-review.yml grants checks: read "
+                "(the model job's check-run reads 403 without it)",
+            )
         grant_list_re = (
             r"`claude-code-review`[\s\S]{0,80}?grant[s]? "
             r"(`contents: read`[\s\S]{0,250}?)(?:and either|and add)"
@@ -761,20 +773,57 @@ def check_workflow(
         ):
             path = root / rel
             if not path.is_file():
+                # A missing or renamed doc would otherwise skip every
+                # assertion about it without recording anything.
+                check(False, f"{rel} exists (grant-list parity target)")
                 continue
             blob = path.read_text(encoding="utf-8")
             m = re.search(pattern, blob)
             listed = m.group(1) if m else ""
             check("actions: read" in listed, message)
-        ref = root / "website" / "reference" / "claude-code-review.qmd"
-        if ref.is_file():
             check(
-                re.search(
-                    r"permissions:\n(?:[^\n]*\n)*?      actions: read",
-                    ref.read_text(encoding="utf-8"),
-                )
-                is not None,
+                "checks: read" in listed,
+                message.replace("actions: read", "checks: read"),
+            )
+        ref = root / "website" / "reference" / "claude-code-review.qmd"
+        check(ref.is_file(), "website/reference/claude-code-review.qmd exists")
+        if ref.is_file():
+            # Only `key: value` lines indented like the block's own entries
+            # may sit between `permissions:` and the grant, so a grant that
+            # merely appears somewhere later in the file does not count.
+            perm_block = r"permissions:\n(?:      [a-z-]+: [a-z-]+\n)*?      "
+            ref_blob = ref.read_text(encoding="utf-8")
+            check(
+                re.search(perm_block + r"actions: read\n", ref_blob) is not None,
                 "website/reference/claude-code-review.qmd Example grants actions: read",
+            )
+            check(
+                re.search(perm_block + r"checks: read\n", ref_blob) is not None,
+                "website/reference/claude-code-review.qmd Example grants checks: read",
+            )
+        wf_doc = root / "website" / "workflows.qmd"
+        check(wf_doc.is_file(), "website/workflows.qmd exists")
+        if wf_doc.is_file():
+            check(
+                "`actions` / `checks: read`" in wf_doc.read_text(encoding="utf-8"),
+                "website/workflows.qmd model-scope list includes checks: read",
+            )
+        dogfood = root / ".github" / "workflows" / "claude-review.yml"
+        check(dogfood.is_file(), ".github/workflows/claude-review.yml exists")
+        if dogfood.is_file():
+            df = load_yaml(dogfood)
+            df_jobs = (df or {}).get("jobs") or {}
+            df_review = next(
+                (
+                    job for job in df_jobs.values()
+                    if isinstance(job, dict)
+                    and "claude-code-review.yml" in str(job.get("uses", ""))
+                ),
+                {},
+            )
+            check(
+                job_permissions(df_review).get("checks") == "read",
+                ".github/workflows/claude-review.yml caller grants checks: read",
             )
 
     if FAILURES:
@@ -892,6 +941,7 @@ jobs:
       pull-requests: read
       issues: read
       actions: read
+      checks: read
     steps:
       - uses: Morrison-Lab/gha/.github/actions/run-claude-review-attempt@v2
       - run: echo "$FC_QUOTA_REASON"
@@ -1090,7 +1140,8 @@ runs:
                 "      contents: read\n"
                 "      pull-requests: read\n"
                 "      issues: read\n"
-                "      actions: read\n",
+                "      actions: read\n"
+                "      checks: read\n",
                 "    permissions: write-all\n",
                 1,
             )
